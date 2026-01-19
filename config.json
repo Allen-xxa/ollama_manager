@@ -1,0 +1,18 @@
+{
+  "server_address": "192.168.1.66",
+  "server_port": "11434",
+  "servers": [
+    {
+      "name": "本地服务器",
+      "address": "192.168.1.66",
+      "port": "11434",
+      "isActive": true
+    },
+    {
+      "name": "Test Server",
+      "address": "127.0.0.1",
+      "port": "11434",
+      "isActive": false
+    }
+  ]
+}
