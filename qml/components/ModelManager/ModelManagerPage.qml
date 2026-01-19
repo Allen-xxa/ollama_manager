@@ -3,11 +3,28 @@ import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
 
 Rectangle {
-        id: modelManagerPage
-        property string currentPage: "modelManager"
-        width: parent.width
-        height: parent.height
-        color: "#121212"
+    id: modelManagerPage
+    property string currentPage: "modelManager"
+    property string deleteModelName: ""
+    property bool showDeleteDialog: false
+    width: parent.width
+    height: parent.height
+    color: "#121212"
+
+    function showDeleteConfirmation(modelName) {
+        deleteModelName = modelName
+        showDeleteDialog = true
+    }
+
+    function closeDeleteDialog() {
+        showDeleteDialog = false
+        deleteModelName = ""
+    }
+
+    function confirmDelete() {
+        modelManager.deleteModel(deleteModelName)
+        closeDeleteDialog()
+    }
     
     ColumnLayout {
         anchors.fill: parent
@@ -354,6 +371,11 @@ Rectangle {
 
                     delegate: Loader {
                         source: "Delegate.qml"
+                        onLoaded: {
+                            item.deleteRequested.connect(function(modelName) {
+                                modelManagerPage.showDeleteConfirmation(modelName)
+                            })
+                        }
                     }
                 }
             }
@@ -362,7 +384,7 @@ Rectangle {
         // 操作面板
         Rectangle {
             Layout.fillWidth: true
-            Layout.preferredHeight: 250
+            Layout.preferredHeight: 100
             color: "#1e1e1e"
             radius: 12
             border {
@@ -424,103 +446,119 @@ Rectangle {
                         }
                     }
                 }
+            }
+        }
+    }
 
-                // 拉取进度条
-                Rectangle {
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 50
-                    color: "#2a2a2a"
-                    radius: 8
-                    border {
-                        width: 1
-                        color: "#333333"
-                    }
+    Item {
+        id: deleteDialogOverlay
+        visible: showDeleteDialog
+        anchors.fill: parent
+        z: 9999
 
-                    RowLayout {
-                        anchors.fill: parent
-                        anchors.margins: 10
-                        spacing: 10
+        Rectangle {
+            anchors.fill: parent
+            color: "#000000"
+            opacity: 0.5
 
-                        Label {
-                            text: "进度:"
-                            color: "#ffffff"
-                            Layout.preferredWidth: 50
-                        }
-
-                        Rectangle {
-                            id: progressBar
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: 12
-                            color: "#333333"
-                            radius: 6
-
-                            Rectangle {
-                                id: progressFill
-                                width: 0
-                                height: parent.height
-                                color: "#4ecdc4"
-                                radius: 6
-                            }
-                        }
-
-                        Label {
-                            id: progressText
-                            text: "0%"
-                            color: "#ffffff"
-                            Layout.preferredWidth: 50
-                        }
-                    }
-                }
-
-                // 下载速度和预估时间
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 20
-
-                    Label {
-                        id: downloadSpeed
-                        text: "下载速度: 0 MB/s"
-                        color: "#999999"
-                    }
-
-                    Label {
-                        id: estimatedTime
-                        text: "预估时间: 0s"
-                        color: "#999999"
-                    }
-                }
+            MouseArea {
+                anchors.fill: parent
+                onClicked: closeDeleteDialog()
             }
         }
 
-        // 状态栏
         Rectangle {
-            id: statusBar
-            Layout.fillWidth: true
-            Layout.preferredHeight: 40
+            width: 400
+            height: 200
             color: "#1e1e1e"
-            radius: 8
+            radius: 12
             border {
                 width: 1
                 color: "#333333"
             }
+            anchors.centerIn: parent
 
-            RowLayout {
+            ColumnLayout {
                 anchors.fill: parent
-                anchors.margins: 10
-                spacing: 10
+                anchors.margins: 20
+                spacing: 20
 
                 Label {
-                    id: statusLabel
-                    text: "就绪"
-                    color: "#999999"
                     Layout.fillWidth: true
+                    text: "删除模型"
+                    font.pointSize: 16
+                    font.bold: true
+                    color: "#ffffff"
+                    horizontalAlignment: Text.AlignHCenter
                 }
 
                 Label {
-                    id: serverInfoLabel
-                    text: "服务器: " + modelManager.serverAddress + ":" + modelManager.serverPort
-                    color: "#4ecdc4"
-                    font.pointSize: 10
+                    Layout.fillWidth: true
+                    text: "正在删除 " + deleteModelName
+                    font.pointSize: 14
+                    color: "#9ca3af"
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 15
+
+                    Item {
+                        Layout.fillWidth: true
+                    }
+
+                    Rectangle {
+                        width: 100
+                        height: 40
+                        color: "#2a2a2a"
+                        radius: 8
+                        border {
+                            width: 1
+                            color: "#333333"
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            onClicked: closeDeleteDialog()
+                        }
+
+                        Label {
+                            anchors.centerIn: parent
+                            text: "取消"
+                            color: "#ffffff"
+                            font.pointSize: 14
+                        }
+                    }
+
+                    Rectangle {
+                        width: 100
+                        height: 40
+                        color: "#ff6b6b"
+                        radius: 8
+                        border {
+                            width: 1
+                            color: "#ff8787"
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            onClicked: confirmDelete()
+                        }
+
+                        Label {
+                            anchors.centerIn: parent
+                            text: "确认"
+                            color: "#ffffff"
+                            font.pointSize: 14
+                            font.bold: true
+                        }
+                    }
+
+                    Item {
+                        Layout.fillWidth: true
+                    }
                 }
             }
         }
@@ -528,8 +566,6 @@ Rectangle {
 
     // 存储信号连接
     property var modelUpdatedConnection
-    property var statusUpdatedConnection
-    property var pullProgressUpdatedConnection
 
     // 连接信号
     Component.onCompleted: {
@@ -552,50 +588,12 @@ Rectangle {
         
         // 主动获取模型列表
         modelManager.getModels()
-        
-        // 连接状态更新信号
-        statusUpdatedConnection = modelManager.statusUpdated.connect(function(status) {
-            if (statusLabel) {
-                statusLabel.text = status
-            }
-        })
-        
-        // 连接进度更新信号
-        pullProgressUpdatedConnection = modelManager.pullProgressUpdated.connect(function(progress, speed, time) {
-            if (progressFill && progressBar && progressText && downloadSpeed && estimatedTime) {
-                // 更新进度条
-                progressFill.width = progressBar.width * (progress / 100)
-                progressText.text = progress + "%"
-                
-                // 更新下载速度
-                downloadSpeed.text = "下载速度: " + speed + " MB/s"
-                
-                // 更新预估时间
-                estimatedTime.text = "预估时间: " + time + "s"
-            }
-        })
-        
-        // 更新服务器信息显示
-        updateServerInfo()
-    }
-    
-    // 更新服务器信息显示
-    function updateServerInfo() {
-        if (serverInfoLabel) {
-            serverInfoLabel.text = "服务器: " + modelManager.serverAddress + ":" + modelManager.serverPort
-        }
     }
     
     // 断开信号连接
     Component.onDestruction: {
         if (modelUpdatedConnection) {
             modelUpdatedConnection.disconnect()
-        }
-        if (statusUpdatedConnection) {
-            statusUpdatedConnection.disconnect()
-        }
-        if (pullProgressUpdatedConnection) {
-            pullProgressUpdatedConnection.disconnect()
         }
     }
 }

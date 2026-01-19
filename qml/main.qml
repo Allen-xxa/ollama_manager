@@ -9,8 +9,17 @@ ApplicationWindow {
     height: 900
     title: "Ollama 模型管理器"
     color: "#121212"
+    
+    // 加载字体
+    FontLoader {
+        id: msyhFont
+        source: "msyh.ttc"
+    }
+    
+    // 设置全局字体
+    font.family: msyhFont.name
 
-    property string currentPage: "modelManager"
+    property string currentPage: "dashboard"
 
     Rectangle {
         anchors.fill: parent
@@ -50,12 +59,20 @@ ApplicationWindow {
             source: {
                 if (currentPage === "dashboard") return "pages/DashboardPage.qml"
                 else if (currentPage === "modelLibrary") return "pages/ModelLibraryPage.qml"
+                else if (currentPage === "modelDetail") return "pages/ModelDetailPage.qml"
                 else if (currentPage === "serverManagement") return "pages/SettingsPage.qml"
+                else if (currentPage === "downloadManager") return "pages/DownloadManagerPage.qml"
                 else return "components/ModelManager/ModelManagerPage.qml"
             }
             onLoaded: {
                 if (item) {
                     item.currentPage = mainWindow.currentPage
+                    // 连接页面变更信号
+                    if (item.pageChanged) {
+                        item.pageChanged.connect(function(page) {
+                            mainWindow.currentPage = page
+                        })
+                    }
                 }
             }
         }

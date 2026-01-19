@@ -4,7 +4,9 @@ import QtQuick.Layouts 1.15
 import "../../utils/Utils.js" as Utils
 
 Item {
-    // 计算总宽度，包括所有列和分隔符
+    id: delegateRoot
+    signal deleteRequested(string modelName)
+
     width: modelList.colWidth1 + 15 + modelList.colWidth4 + 15 + modelList.colWidth2 + 15 + modelList.colWidth3 + 15 + modelList.colWidth5 + 15 + modelList.colWidth6
     height: 45
 
@@ -218,7 +220,7 @@ Item {
                         MouseArea {
                             anchors.fill: parent
                             onClicked: {
-                                modelManager.deleteModel(name)
+                                delegateRoot.deleteRequested(name)
                             }
                         }
 
