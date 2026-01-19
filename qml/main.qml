@@ -5,8 +5,8 @@ import QtQuick.Layouts 1.15
 ApplicationWindow {
     id: mainWindow
     visible: true
-    width: 1280
-    height: 800
+    width: 1400
+    height: 900
     title: "Ollama 模型管理器"
     color: "#121212"
 
@@ -50,7 +50,7 @@ ApplicationWindow {
             source: {
                 if (currentPage === "dashboard") return "pages/DashboardPage.qml"
                 else if (currentPage === "modelLibrary") return "pages/ModelLibraryPage.qml"
-                else if (currentPage === "settings") return "pages/SettingsPage.qml"
+                else if (currentPage === "serverManagement") return "pages/SettingsPage.qml"
                 else return "components/ModelManager/ModelManagerPage.qml"
             }
             onLoaded: {

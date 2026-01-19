@@ -332,11 +332,11 @@ Rectangle {
                 // 模型列表
                 ListView {
                     id: modelList
-                    property real colWidth1: 250
+                    property real colWidth1: 500
                     property real colWidth2: 80
                     property real colWidth3: 100
                     property real colWidth4: 150
-                    property real colWidth5: 100
+                    property real colWidth5: 80
                     property real colWidth6: 140
                     Layout.fillWidth: true
                     Layout.fillHeight: true

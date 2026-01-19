@@ -24,7 +24,7 @@ Rectangle {
             spacing: 10
 
             Label {
-                text: "设置"
+                text: "服务器管理"
                 font.pointSize: 16
                 font.bold: true
                 color: "#ffffff"
@@ -191,7 +191,7 @@ Rectangle {
 
                         // 操作列
                         Item {
-                            Layout.preferredWidth: 140
+                            Layout.preferredWidth: 190
                             Layout.fillHeight: true
                             Label {
                                 anchors.centerIn: parent
@@ -328,7 +328,7 @@ Rectangle {
 
                             // 操作
                             Item {
-                                Layout.preferredWidth: 140
+                                Layout.preferredWidth: 190
                                 Layout.fillHeight: true
                                 RowLayout {
                                     anchors.centerIn: parent
@@ -347,6 +347,32 @@ Rectangle {
                                             border {
                                                 width: 1
                                                 color: "#5eddd6"
+                                            }
+                                        }
+                                        contentItem: Text {
+                                            text: parent.text
+                                            color: "#ffffff"
+                                            font.pointSize: 10
+                                            horizontalAlignment: Text.AlignHCenter
+                                            verticalAlignment: Text.AlignVCenter
+                                        }
+                                    }
+
+                                    Button {
+                                        text: "编辑"
+                                        width: 50
+                                        height: 28
+                                        onClicked: {
+                                            editServerDialog.serverIndex = index
+                                            editServerDialog.serverData = modelData
+                                            editServerDialog.visible = true
+                                        }
+                                        background: Rectangle {
+                                            color: "#3498db"
+                                            radius: 6
+                                            border {
+                                                width: 1
+                                                color: "#44a8eb"
                                             }
                                         }
                                         contentItem: Text {
@@ -562,6 +588,195 @@ Rectangle {
                         verticalAlignment: Text.AlignVCenter
                     }
                 }
+            }
+        }
+    }
+    
+    // 编辑服务器对话框
+    Rectangle {
+        id: editServerDialog
+        visible: false
+        anchors.centerIn: parent
+        width: 500
+        height: 300
+        color: "#1e1e1e"
+        radius: 12
+        border {
+            width: 1
+            color: "#333333"
+        }
+        z: 100
+        
+        // 存储要编辑的服务器索引和数据
+        property int serverIndex: -1
+        property var serverData: null
+
+        ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: 20
+            spacing: 20
+
+            Label {
+                text: "编辑服务器"
+                font.pointSize: 16
+                font.bold: true
+                color: "#ffffff"
+            }
+
+            // 服务器名称
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 10
+
+                Label {
+                    text: "服务器名称:"
+                    color: "#ffffff"
+                    Layout.preferredWidth: 100
+                }
+
+                TextField {
+                    id: editServerName
+                    placeholderText: "输入服务器名称"
+                    Layout.fillWidth: true
+                    background: Rectangle {
+                        color: "#2a2a2a"
+                        radius: 8
+                        border {
+                            width: 1
+                            color: "#333333"
+                        }
+                    }
+                    color: "#ffffff"
+                    placeholderTextColor: "#999999"
+                }
+            }
+
+            // 服务器地址
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 10
+
+                Label {
+                    text: "服务器地址:"
+                    color: "#ffffff"
+                    Layout.preferredWidth: 100
+                }
+
+                TextField {
+                    id: editServerAddress
+                    placeholderText: "localhost"
+                    Layout.fillWidth: true
+                    background: Rectangle {
+                        color: "#2a2a2a"
+                        radius: 8
+                        border {
+                            width: 1
+                            color: "#333333"
+                        }
+                    }
+                    color: "#ffffff"
+                    placeholderTextColor: "#999999"
+                }
+            }
+
+            // 端口
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 10
+
+                Label {
+                    text: "端口:"
+                    color: "#ffffff"
+                    Layout.preferredWidth: 100
+                }
+
+                TextField {
+                    id: editServerPort
+                    placeholderText: "11434"
+                    Layout.fillWidth: true
+                    background: Rectangle {
+                        color: "#2a2a2a"
+                        radius: 8
+                        border {
+                            width: 1
+                            color: "#333333"
+                        }
+                    }
+                    color: "#ffffff"
+                    placeholderTextColor: "#999999"
+                }
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 10
+
+                Item {
+                    Layout.fillWidth: true
+                }
+
+                Button {
+                    text: "取消"
+                    onClicked: {
+                        editServerDialog.visible = false
+                        editServerName.text = ""
+                        editServerAddress.text = ""
+                        editServerPort.text = ""
+                    }
+                    background: Rectangle {
+                        color: "#2a2a2a"
+                        radius: 8
+                        border {
+                            width: 1
+                            color: "#333333"
+                        }
+                    }
+                    contentItem: Text {
+                        text: parent.text
+                        color: "#ffffff"
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                }
+
+                Button {
+                    text: "保存"
+                    onClicked: {
+                        if (editServerName.text && editServerAddress.text && editServerPort.text) {
+                            // 更新服务器信息
+                            modelManager.updateServer(editServerDialog.serverIndex, editServerName.text, editServerAddress.text, editServerPort.text)
+                            
+                            // 清空输入
+                            editServerName.text = ""
+                            editServerAddress.text = ""
+                            editServerPort.text = ""
+                            editServerDialog.visible = false
+                        }
+                    }
+                    background: Rectangle {
+                        color: "#4ecdc4"
+                        radius: 8
+                        border {
+                            width: 1
+                            color: "#5eddd6"
+                        }
+                    }
+                    contentItem: Text {
+                        text: parent.text
+                        color: "#ffffff"
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                }
+            }
+        }
+        
+        // 当对话框可见时，填充表单数据
+        onVisibleChanged: {
+            if (visible && serverData) {
+                editServerName.text = serverData.name || ""
+                editServerAddress.text = serverData.address || ""
+                editServerPort.text = serverData.port || ""
             }
         }
     }

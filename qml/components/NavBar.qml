@@ -174,11 +174,11 @@ Rectangle {
                 }
             }
 
-            // 设置
+            // 服务器管理
             Rectangle {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 50
-                color: currentPage === "settings" ? "#333333" : "#1e1e1e"
+                color: currentPage === "serverManagement" ? "#333333" : "#1e1e1e"
                 border {
                     width: 1
                     color: "#333333"
@@ -186,13 +186,13 @@ Rectangle {
 
                 MouseArea {
                     anchors.fill: parent
-                    onClicked: pageChanged("settings")
+                    onClicked: pageChanged("serverManagement")
                 }
 
                 Label {
                     anchors.centerIn: parent
-                    text: "设置"
-                    color: currentPage === "settings" ? "#ffffff" : "#cccccc"
+                    text: "服务器管理"
+                    color: currentPage === "serverManagement" ? "#ffffff" : "#cccccc"
                 }
             }
 
