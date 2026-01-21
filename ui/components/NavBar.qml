@@ -10,7 +10,7 @@ Rectangle {
         width: 1
         color: "#333333"
     }
-    radius: 8
+    radius: 0
     z: 0
 
     property string currentPage: "dashboard"
@@ -21,33 +21,74 @@ Rectangle {
     property bool isServerConnected: false
     property bool isTestingConnection: false
     property string statusMessage: "就绪"  // 状态描述信息
+    property real serverLatency: 0  // 服务器延迟（毫秒）
     
     // 连接到modelManager获取活跃服务器信息
     Connections {
         target: modelManager
         function onServersUpdated() {
-            updateActiveServer()
+            if (modelManager) {
+                updateActiveServer()
+                // 服务器列表更新后，延迟一小段时间再测试连接
+                // 这样可以确保活跃服务器已经正确更新
+                Qt.callLater(function() {
+                    if (modelManager && activeServer) {
+                        testServerConnectionAsync(activeServer.address, activeServer.port)
+                    }
+                })
+            }
         }
         
         // 连接服务器连接测试结果信号
-        function onServerConnectionTested(isConnected) {
+        function onServerConnectionTested(isConnected, latency) {
             isServerConnected = isConnected
             isTestingConnection = false
+            serverLatency = latency
+            statusMessage = isConnected ? `连接成功 (${latency.toFixed(1)}ms)` : "连接失败"
         }
         
         // 连接状态更新信号
         function onStatusUpdated(status) {
             statusMessage = status
+            // 只有当状态不是"连接中..."时才考虑重新测试连接
+            if (modelManager && status !== "连接中..." && activeServer) {
+                // 避免在连接测试过程中重复触发
+                if (!isTestingConnection) {
+                    testServerConnectionAsync(activeServer.address, activeServer.port)
+                }
+            }
         }
     }
     
     // 初始化时更新活跃服务器信息
     Component.onCompleted: {
         updateActiveServer()
+        // 启动定时器，每10秒检查一次服务器状态
+        statusTimer.start()
+    }
+    
+    // 定时器，定期检查服务器状态
+    Timer {
+        id: statusTimer
+        interval: 10000 // 10秒
+        running: false
+        repeat: true
+        onTriggered: {
+            if (modelManager && activeServer) {
+                testServerConnectionAsync(activeServer.address, activeServer.port)
+            }
+        }
     }
     
     // 更新活跃服务器信息
     function updateActiveServer() {
+        if (!modelManager) {
+            activeServer = null
+            isServerConnected = false
+            isTestingConnection = false
+            return
+        }
+        
         var servers = modelManager.servers
         for (var i = 0; i < servers.length; i++) {
             if (servers[i].isActive) {
@@ -69,15 +110,24 @@ Rectangle {
         }
     }
     
+
+    
     // 异步测试服务器连接
     function testServerConnectionAsync(address, port) {
         // 设置测试中状态
         isTestingConnection = true
-        // 先假设连接失败，避免UI卡顿
         isServerConnected = false
+        statusMessage = "连接中..."
         
         // 使用模型管理器的异步测试方法
-        modelManager.testServerConnectionAsync(address, port)
+        if (modelManager) {
+            modelManager.testServerConnectionAsync(address, port)
+        } else {
+            // 如果modelManager不存在，设置连接失败状态
+            isTestingConnection = false
+            isServerConnected = false
+            statusMessage = "连接失败"
+        }
     }
 
     ColumnLayout {
@@ -87,17 +137,29 @@ Rectangle {
         // 标题
         Item {
             Layout.fillWidth: true
-            Layout.preferredHeight: 60
+            Layout.preferredHeight: 70
             Layout.leftMargin: 10
             Layout.rightMargin: 10
             Layout.topMargin: 10
 
-            Label {
+            ColumnLayout {
                 anchors.centerIn: parent
-                text: "Ollama管理器"
-                font.pointSize: 14
-                font.bold: true
-                color: "#ffffff"
+                spacing: 4
+
+                Label {
+                    Layout.alignment: Qt.AlignHCenter
+                    text: "Ollama管理器"
+                    font.pointSize: 14
+                    font.bold: true
+                    color: "#ffffff"
+                }
+
+                Label {
+                    Layout.alignment: Qt.AlignHCenter
+                    text: appVersion ? "v" + appVersion : ""
+                    font.pointSize: 10
+                    color: "#999999"
+                }
             }
         }
 
@@ -230,7 +292,7 @@ Rectangle {
 
                 Label {
                     anchors.centerIn: parent
-                    text: "模型管理"
+                    text: "已安装"
                     color: currentPage === "modelManager" ? "#ffffff" : "#cccccc"
                 }
             }
@@ -315,6 +377,166 @@ Rectangle {
                 }
             }
 
+            // 助手分类
+            Label {
+                Layout.fillWidth: true
+                text: "助手"
+                font.pointSize: 10
+                color: "#999999"
+                Layout.topMargin: 10
+                Layout.leftMargin: 5
+            }
+            
+            // 添加助手
+            Rectangle {
+                id: addAssistantBtn
+                Layout.fillWidth: true
+                Layout.preferredHeight: 40
+                color: currentPage === "addAssistant" ? "#2e4e3a" : "#1e1e1e"
+                border {
+                    width: 1
+                    color: "#333333"
+                }
+                radius: 4
+
+                MouseArea {
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    onClicked: pageChanged("addAssistant")
+                    onEntered: {
+                        if (currentPage !== "addAssistant") {
+                            addAssistantBtn.color = "#2e4e3a"
+                        }
+                    }
+                    onExited: {
+                        if (currentPage !== "addAssistant") {
+                            addAssistantBtn.color = "#1e1e1e"
+                        }
+                    }
+                }
+
+                Label {
+                    anchors.centerIn: parent
+                    text: "+添加助手"
+                    color: "#4ecdc4"
+                }
+            }
+            
+            // 默认助手
+            Rectangle {
+                id: defaultAssistantBtn
+                Layout.fillWidth: true
+                Layout.preferredHeight: 40
+                color: currentPage === "defaultAssistant" ? "#333333" : "#1e1e1e"
+                border {
+                    width: 1
+                    color: "#333333"
+                }
+                radius: 4
+
+                MouseArea {
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    onClicked: pageChanged("defaultAssistant")
+                    onEntered: {
+                        if (currentPage !== "defaultAssistant") {
+                            defaultAssistantBtn.color = "#2a2a2a"
+                        }
+                    }
+                    onExited: {
+                        if (currentPage !== "defaultAssistant") {
+                            defaultAssistantBtn.color = "#1e1e1e"
+                        }
+                    }
+                }
+
+                Label {
+                    anchors.centerIn: parent
+                    text: "默认助手"
+                    color: currentPage === "defaultAssistant" ? "#ffffff" : "#cccccc"
+                }
+            }
+
+            // 设置分类
+            Label {
+                Layout.fillWidth: true
+                text: "设置"
+                font.pointSize: 10
+                color: "#999999"
+                Layout.topMargin: 10
+                Layout.leftMargin: 5
+            }
+            
+            // 设置
+            Rectangle {
+                id: settingsBtn
+                Layout.fillWidth: true
+                Layout.preferredHeight: 40
+                color: currentPage === "settings" ? "#333333" : "#1e1e1e"
+                border {
+                    width: 1
+                    color: "#333333"
+                }
+                radius: 4
+
+                MouseArea {
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    onClicked: pageChanged("settings")
+                    onEntered: {
+                        if (currentPage !== "settings") {
+                            settingsBtn.color = "#2a2a2a"
+                        }
+                    }
+                    onExited: {
+                        if (currentPage !== "settings") {
+                            settingsBtn.color = "#1e1e1e"
+                        }
+                    }
+                }
+
+                Label {
+                    anchors.centerIn: parent
+                    text: "设置"
+                    color: currentPage === "settings" ? "#ffffff" : "#cccccc"
+                }
+            }
+
+            // 关于
+            Rectangle {
+                id: aboutBtn
+                Layout.fillWidth: true
+                Layout.preferredHeight: 40
+                color: currentPage === "about" ? "#333333" : "#1e1e1e"
+                border {
+                    width: 1
+                    color: "#333333"
+                }
+                radius: 4
+
+                MouseArea {
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    onClicked: pageChanged("about")
+                    onEntered: {
+                        if (currentPage !== "about") {
+                            aboutBtn.color = "#2a2a2a"
+                        }
+                    }
+                    onExited: {
+                        if (currentPage !== "about") {
+                            aboutBtn.color = "#1e1e1e"
+                        }
+                    }
+                }
+
+                Label {
+                    anchors.centerIn: parent
+                    text: "关于"
+                    color: currentPage === "about" ? "#ffffff" : "#cccccc"
+                }
+            }
+
             // 底部空间
             Item {
                 Layout.fillHeight: true
@@ -360,7 +582,7 @@ Rectangle {
                                     width: 10
                                     height: 10
                                     radius: 5
-                                    color: isTestingConnection ? "#feca57" : (isServerConnected ? "#4ecdc4" : "#ff4757")
+                                    color: isTestingConnection ? "#feca57" : (isServerConnected ? "#00FF00" : "#ff4757")
                                 }
                             }
                             
@@ -415,11 +637,14 @@ Rectangle {
     
     // 监听currentPage变化，直接更新每个按钮的颜色
     onCurrentPageChanged: {
-        // 直接更新每个按钮的颜色，确保状态正确
         dashboardBtn.color = currentPage === "dashboard" ? "#333333" : "#1e1e1e"
         modelLibraryBtn.color = currentPage === "modelLibrary" ? "#333333" : "#1e1e1e"
         modelManagerBtn.color = currentPage === "modelManager" ? "#333333" : "#1e1e1e"
         downloadManagerBtn.color = currentPage === "downloadManager" ? "#333333" : "#1e1e1e"
         serverManagementBtn.color = currentPage === "serverManagement" ? "#333333" : "#1e1e1e"
+        addAssistantBtn.color = currentPage === "addAssistant" ? "#2e4e3a" : "#1e1e1e"
+        defaultAssistantBtn.color = currentPage === "defaultAssistant" ? "#333333" : "#1e1e1e"
+        settingsBtn.color = currentPage === "settings" ? "#333333" : "#1e1e1e"
+        aboutBtn.color = currentPage === "about" ? "#333333" : "#1e1e1e"
     }
 }

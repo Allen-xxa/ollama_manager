@@ -13,7 +13,7 @@ ApplicationWindow {
     // 加载字体
     FontLoader {
         id: msyhFont
-        source: "msyh.ttc"
+        source: "assets/fonts/msyh.ttc"
     }
     
     // 设置全局字体
@@ -60,13 +60,21 @@ ApplicationWindow {
                 if (currentPage === "dashboard") return "pages/DashboardPage.qml"
                 else if (currentPage === "modelLibrary") return "pages/ModelLibraryPage.qml"
                 else if (currentPage === "modelDetail") return "pages/ModelDetailPage.qml"
-                else if (currentPage === "serverManagement") return "pages/SettingsPage.qml"
+                else if (currentPage === "modelAllVersions") return "pages/ModelAllVersionsPage.qml"
+                else if (currentPage === "serverManagement") return "pages/ServerManagerPage.qml"
                 else if (currentPage === "downloadManager") return "pages/DownloadManagerPage.qml"
+                else if (currentPage === "addAssistant") return "pages/AddAssistantPage.qml"
+                else if (currentPage === "defaultAssistant") return "pages/DefaultAssistantPage.qml"
+                else if (currentPage === "settings") return "pages/SettingsPage.qml"
+                else if (currentPage === "about") return "pages/AboutPage.qml"
                 else return "components/ModelManager/ModelManagerPage.qml"
             }
             onLoaded: {
                 if (item) {
-                    item.currentPage = mainWindow.currentPage
+                    // 只在页面有currentPage属性时才赋值
+                    if (item.hasOwnProperty("currentPage")) {
+                        item.currentPage = mainWindow.currentPage
+                    }
                     // 连接页面变更信号
                     if (item.pageChanged) {
                         item.pageChanged.connect(function(page) {

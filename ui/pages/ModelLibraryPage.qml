@@ -45,6 +45,32 @@ Rectangle {
         updateDisplayModels()
     }
     
+    // 异步翻译辅助函数
+    function translateDescriptionAsync(text, callback) {
+        if (!text) {
+            callback("")
+            return
+        }
+        
+        // 创建临时存储对象来跟踪翻译状态
+        var translationKey = text
+        
+        // 监听翻译完成信号
+        function onTranslationCompleted(original, translated) {
+            if (original === translationKey) {
+                callback(translated)
+                // 移除信号连接
+                modelManager.translationCompleted.disconnect(onTranslationCompleted)
+            }
+        }
+        
+        // 连接信号
+        modelManager.translationCompleted.connect(onTranslationCompleted)
+        
+        // 触发异步翻译
+        modelManager.translateDescriptionAsync(text)
+    }
+    
     // 更新当前页显示的模型
     function updateDisplayModels() {
         var startIndex = (currentPageNum - 1) * pageSize
@@ -63,16 +89,63 @@ Rectangle {
             }
             
             modelLibrary = models
-            totalModels = models.length // 使用实际获取的模型数量
+            totalModels = total  // 使用API返回的总数
             updateTotalPages()
             isLoading = false
         }
         
         function onModelLibraryStatusUpdated(status) {
-            console.log("Model library status:", status)
+            // console.log("Model library status:", status)
             if (status.includes("失败")) {
                 errorMessage = status
                 isLoading = false
+            }
+        }
+    }
+    
+    // 加载状态 - 改为类似设置页保存提示的样式
+    Rectangle {
+        id: loadingIndicator
+        width: 200
+        height: 50
+        color: "#3b82f6"
+        radius: 8
+        border {
+            width: 1
+            color: "#60a5fa"
+        }
+        opacity: 1
+        visible: isLoading
+        anchors.centerIn: parent
+        z: 9999
+        
+        RowLayout {
+            anchors.fill: parent
+            anchors.margins: 15
+            spacing: 10
+            
+            // 加载动画
+            Canvas {
+                width: 20
+                height: 20
+                Layout.alignment: Qt.AlignVCenter
+                
+                onPaint: {
+                    var ctx = getContext("2d")
+                    ctx.clearRect(0, 0, width, height)
+                    ctx.strokeStyle = "#ffffff"
+                    ctx.lineWidth = 2
+                    ctx.beginPath()
+                    ctx.arc(width/2, height/2, width/3, 0, Math.PI*2)
+                    ctx.stroke()
+                }
+            }
+            
+            Label {
+                text: "加载中..."
+                color: "#ffffff"
+                font.pointSize: 14
+                Layout.alignment: Qt.AlignVCenter
             }
         }
     }
@@ -86,6 +159,7 @@ Rectangle {
         RowLayout {
             Layout.fillWidth: true
             Layout.preferredHeight: 50
+            Layout.rightMargin: 10
             spacing: 20
             
             // 标题
@@ -205,90 +279,52 @@ Rectangle {
         }
         
         // 模型列表区域
-        Rectangle {
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            color: "transparent"
-            
-            // 加载状态
             Rectangle {
-                id: loadingIndicator
-                anchors.fill: parent
-                color: "#121212"
-                opacity: 0.8
-                visible: isLoading
-                
-                Column {
-                    anchors.centerIn: parent
-                    spacing: 15
-                    
-                    // 加载动画
-                    Canvas {
-                        width: 40
-                        height: 40
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        
-                        onPaint: {
-                            var ctx = getContext("2d")
-                            ctx.clearRect(0, 0, width, height)
-                            ctx.strokeStyle = "#3b82f6"
-                            ctx.lineWidth = 3
-                            ctx.beginPath()
-                            ctx.arc(width/2, height/2, width/3, 0, Math.PI*2)
-                            ctx.stroke()
-                        }
-                    }
-                    
-                    Label {
-                        text: "加载中..."
-                        color: "#ffffff"
-                        font.pointSize: 14
-                        anchors.horizontalCenter: parent.horizontalCenter
-                    }
-                }
-            }
-            
-            // 错误信息
-            Rectangle {
-                id: errorIndicator
-                anchors.fill: parent
+                Layout.fillWidth: true
+                Layout.fillHeight: true
                 color: "transparent"
-                visible: errorMessage !== ""
                 
-                Column {
-                    anchors.centerIn: parent
-                    spacing: 10
+                // 错误信息
+                Rectangle {
+                    id: errorIndicator
+                    anchors.fill: parent
+                    color: "transparent"
+                    visible: errorMessage !== ""
                     
-                    Label {
-                        text: errorMessage
-                        color: "#ef4444"
-                        font.pointSize: 14
-                        horizontalAlignment: Text.AlignHCenter
-                    }
-                    
-                    // 重试按钮
-                    Rectangle {
-                        width: 100
-                        height: 36
-                        color: "#3b82f6"
-                        radius: 6
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        
-                        MouseArea {
-                            anchors.fill: parent
-                            onClicked: loadModels()
-                        }
+                    Column {
+                        anchors.centerIn: parent
+                        spacing: 10
                         
                         Label {
-                            anchors.centerIn: parent
-                            text: "重试"
-                            color: "#ffffff"
-                            font.pointSize: 12
-                            font.bold: true
+                            text: errorMessage
+                            color: "#ef4444"
+                            font.pointSize: 14
+                            horizontalAlignment: Text.AlignHCenter
+                        }
+                        
+                        // 重试按钮
+                        Rectangle {
+                            width: 100
+                            height: 36
+                            color: "#3b82f6"
+                            radius: 6
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: loadModels()
+                            }
+                            
+                            Label {
+                                anchors.centerIn: parent
+                                text: "重试"
+                                color: "#ffffff"
+                                font.pointSize: 12
+                                font.bold: true
+                            }
                         }
                     }
                 }
-            }
             
             // 模型列表
             Rectangle {
@@ -300,7 +336,7 @@ Rectangle {
                 Flickable {
                     id: modelsList
                     anchors.fill: parent
-                    contentWidth: parent.width
+                    contentWidth: contentColumn.width
                     contentHeight: contentColumn.height
                     clip: true
                     interactive: contentHeight > height
@@ -324,7 +360,7 @@ Rectangle {
                     
                     Column {
                         id: contentColumn
-                        width: parent.width
+                        width: modelsListContainer.width - 10 // 减去滚动条宽度和边距
                         spacing: 15
                         
                         Repeater {
@@ -382,33 +418,26 @@ Rectangle {
                                                     MouseArea {
                                                         anchors.fill: parent
                                                         onClicked: {
-                                                            console.log("Translation button clicked for model:", modelData.display_name);
-                                                            console.log("Current displayDescription:", modelData.displayDescription);
-                                                            console.log("Original description:", modelData.description);
+                                                            // console.log("Translation button clicked for model:", modelData.display_name);
+                                                            // console.log("Current displayDescription:", modelData.displayDescription);
+                                                            // console.log("Original description:", modelData.description);
                                                             
                                                             // 切换翻译状态
                                                             if (modelData.displayDescription === modelData.description) {
-                                                                console.log("Translating to Chinese:", modelData.description);
-                                                                // 翻译为中文
-                                                                var translated = modelManager.translateDescription(modelData.description);
-                                                                console.log("Translated result:", translated);
-                                                                
-                                                                // 更新模型数据
-                                                                var modelIndex = modelLibrary.findIndex(function(m) {
-                                                                    return m.name === modelData.name;
+                                                                // 翻译为中文（异步）
+                                                                translateDescriptionAsync(modelData.description, function(translated) {
+                                                                    // 更新模型数据
+                                                                    var modelIndex = modelLibrary.findIndex(function(m) {
+                                                                        return m.name === modelData.name;
+                                                                    });
+                                                                    
+                                                                    if (modelIndex !== -1) {
+                                                                        modelLibrary[modelIndex].displayDescription = translated;
+                                                                        // 强制更新displayModels
+                                                                        updateDisplayModels();
+                                                                    }
                                                                 });
-                                                                
-                                                                if (modelIndex !== -1) {
-                                                                    console.log("Updating model at index:", modelIndex);
-                                                                    modelLibrary[modelIndex].displayDescription = translated;
-                                                                    // 强制更新displayModels
-                                                                    updateDisplayModels();
-                                                                    console.log("Model updated successfully");
-                                                                } else {
-                                                                    console.log("Model not found in library");
-                                                                }
                                                             } else {
-                                                                console.log("Restoring to English");
                                                                 // 恢复英文
                                                                 var modelIndex = modelLibrary.findIndex(function(m) {
                                                                     return m.name === modelData.name;
@@ -418,7 +447,6 @@ Rectangle {
                                                                     modelLibrary[modelIndex].displayDescription = modelLibrary[modelIndex].description;
                                                                     // 强制更新displayModels
                                                                     updateDisplayModels();
-                                                                    console.log("Restored to original description");
                                                                 }
                                                             }
                                                         }
@@ -428,7 +456,7 @@ Rectangle {
                                                         anchors.centerIn: parent
                                                         width: 24
                                                         height: 24
-                                                        source: "../img/trans.png"
+                                                        source: "../assets/img/trans.png"
                                                         fillMode: Image.PreserveAspectFit
                                                     }
                                                 }
@@ -481,13 +509,13 @@ Rectangle {
                                             MouseArea {
                                                 anchors.fill: parent
                                                 onClicked: {
-                                                    console.log("Query model details:", modelData.name)
-                                                    console.log("Model link:", modelData.link)
+                                                    // console.log("Query model details:", modelData.name)
+                                                    // console.log("Model link:", modelData.link)
                                                     // 存储当前模型数据
                                                     modelManager.setCurrentModel(modelData)
                                                     // 发送页面变更信号
                                                     modelLibraryPage.pageChanged("modelDetail")
-                                                    console.log("Page changed signal sent for modelDetail")
+                                                    // console.log("Page changed signal sent for modelDetail")
                                                 }
                                             }
                                             

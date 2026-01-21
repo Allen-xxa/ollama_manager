@@ -18,6 +18,9 @@ Rectangle {
     property bool isLoading: false
     property string errorMessage: ""
     property bool showPullDialog: false  // 控制拉取提示弹窗显示
+    property bool isTranslated: false  // 跟踪是否已经翻译
+    property string originalDescription: ""  // 存储原始描述
+    property string originalModelDescription: ""  // 存储原始详细描述
     
     // 显示拉取提示弹窗
     function showPullConfirmation(modelName) {
@@ -36,7 +39,10 @@ Rectangle {
     Component.onCompleted: {
         if (modelManager.currentModel) {
             currentModelData = modelManager.currentModel
-            console.log("Model data loaded:", currentModelData)
+            // 保存原始描述
+            originalDescription = currentModelData.description || ""
+            originalModelDescription = modelDescription || ""
+            // console.log("Model data loaded:", currentModelData)
             loadModelDetails()
         } else {
             errorMessage = "未找到模型数据"
@@ -58,7 +64,70 @@ Rectangle {
     function goBack() {
         // 发送页面变更信号
         modelDetailPage.pageChanged("modelLibrary")
-        console.log("Page changed signal sent for modelLibrary")
+        // console.log("Page changed signal sent for modelLibrary")
+    }
+    
+    // 翻译模型描述
+    function translateModelDescription() {
+        if (!currentModelData) return
+        
+        isLoading = true
+        
+        if (!isTranslated) {
+            // 保存原始描述（如果还没有保存）
+            if (!originalDescription) {
+                originalDescription = currentModelData.description || ""
+            }
+            if (!originalModelDescription) {
+                originalModelDescription = modelDescription || ""
+            }
+            
+            // 异步翻译简单描述
+            translateDescriptionAsync(currentModelData.description, function(translatedSimple) {
+                // 异步翻译详细描述
+                translateDescriptionAsync(modelDescription, function(translatedDetailed) {
+                    // 更新显示
+                    currentModelData.description = translatedSimple
+                    modelDescription = translatedDetailed
+                    isTranslated = true
+                    isLoading = false
+                })
+            })
+        } else {
+            // 恢复原始描述
+            currentModelData.description = originalDescription
+            modelDescription = originalModelDescription
+            isTranslated = false
+            isLoading = false
+        }
+    }
+    
+    // 异步翻译辅助函数
+    function translateDescriptionAsync(text, callback) {
+        if (!text) {
+            callback("")
+            return
+        }
+        
+        // 创建临时存储对象来跟踪翻译状态
+        var translationKey = text
+        var translationCache = {}
+        
+        // 监听翻译完成信号
+        function onTranslationCompleted(original, translated) {
+            if (original === translationKey) {
+                translationCache[original] = translated
+                callback(translated)
+                // 移除信号连接
+                modelManager.translationCompleted.disconnect(onTranslationCompleted)
+            }
+        }
+        
+        // 连接信号
+        modelManager.translationCompleted.connect(onTranslationCompleted)
+        
+        // 触发异步翻译
+        modelManager.translateDescriptionAsync(text)
     }
     
     // 监听模型详情更新信号
@@ -68,18 +137,22 @@ Rectangle {
         function onModelDetailsUpdated(versions, description) {
             modelVersions = versions
             modelDescription = description
+            // 保存原始详细描述
+            if (!isTranslated) {
+                originalModelDescription = description
+            }
             isLoading = false
-            console.log("Model details updated. Versions:", versions.length)
+            // console.log("Model details updated. Versions:", versions.length)
             
             // 添加详细的调试信息
-            for (var i = 0; i < versions.length; i++) {
-                var version = versions[i]
-                console.log("Version", i + 1, ":", JSON.stringify(version))
-            }
+            // for (var i = 0; i < versions.length; i++) {
+            //     var version = versions[i]
+            //     console.log("Version", i + 1, ":", JSON.stringify(version))
+            // }
         }
         
         function onModelDetailsStatusUpdated(status) {
-            console.log("Model details status:", status)
+            // console.log("Model details status:", status)
             if (status.includes("失败")) {
                 errorMessage = status
                 isLoading = false
@@ -87,62 +160,117 @@ Rectangle {
         }
     }
     
-    ColumnLayout {
-        anchors.fill: parent
+    // 顶部导航栏
+    RowLayout {
+        Layout.fillWidth: true
+        Layout.preferredHeight: 70
+        spacing: 15
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
         anchors.margins: 20
-        spacing: 20
         
-        // 顶部导航栏
-        RowLayout {
-            Layout.fillWidth: true
-            Layout.preferredHeight: 50
-            spacing: 15
-            
-            // 返回按钮
-            Rectangle {
-                width: 40
-                height: 40
-                color: "#1e1e1e"
-                radius: 8
-                border {
-                    width: 1
-                    color: "#333333"
-                }
-                
-                MouseArea {
-                    anchors.fill: parent
-                    onClicked: goBack()
-                }
-                
-                Canvas {
-                    anchors.centerIn: parent
-                    width: 20
-                    height: 20
-                    
-                    onPaint: {
-                        var ctx = getContext("2d")
-                        ctx.clearRect(0, 0, width, height)
-                        ctx.strokeStyle = "#ffffff"
-                        ctx.lineWidth = 2
-                        ctx.beginPath()
-                        ctx.moveTo(width * 0.7, height * 0.3)
-                        ctx.lineTo(width * 0.3, height * 0.5)
-                        ctx.lineTo(width * 0.7, height * 0.7)
-                        ctx.stroke()
-                    }
-                }
+        // 返回按钮
+        Rectangle {
+            width: 40
+            height: 40
+            color: "#1e1e1e"
+            radius: 8
+            border {
+                width: 1
+                color: "#333333"
             }
             
-            // 标题
-            Label {
-                Layout.fillWidth: true
-                Layout.alignment: Qt.AlignVCenter
-                text: currentModelData ? currentModelData.display_name : "模型详情"
-                font.pointSize: 18
-                font.bold: true
-                color: "#ffffff"
+            MouseArea {
+                anchors.fill: parent
+                onClicked: goBack()
+            }
+            
+            Canvas {
+                anchors.centerIn: parent
+                width: 20
+                height: 20
+                
+                onPaint: {
+                    var ctx = getContext("2d")
+                    ctx.clearRect(0, 0, width, height)
+                    ctx.strokeStyle = "#ffffff"
+                    ctx.lineWidth = 2
+                    ctx.beginPath()
+                    ctx.moveTo(width * 0.7, height * 0.3)
+                    ctx.lineTo(width * 0.3, height * 0.5)
+                    ctx.lineTo(width * 0.7, height * 0.7)
+                    ctx.stroke()
+                }
             }
         }
+        
+        // 标题
+        Label {
+            Layout.fillWidth: true
+            Layout.alignment: Qt.AlignVCenter
+            text: currentModelData ? currentModelData.display_name : "模型详情"
+            font.pointSize: 18
+            font.bold: true
+            color: "#ffffff"
+        }
+        
+        // 翻译按钮
+        Rectangle {
+            width: 40
+            height: 40
+            radius: 20
+            color: "#3b82f6"
+            
+            MouseArea {
+                anchors.fill: parent
+                onClicked: {
+                    // console.log("Translation button clicked");
+                    translateModelDescription();
+                }
+            }
+            
+            Label {
+                anchors.centerIn: parent
+                text: isTranslated ? "EN" : "中"
+                color: "#ffffff"
+                font.pointSize: 12
+                font.bold: true
+            }
+        }
+    }
+    
+    // 页面滚动容器
+    Flickable {
+        id: pageFlickable
+        anchors.fill: parent
+        anchors.topMargin: 80
+        anchors.margins: 20
+        contentWidth: mainColumn.width
+        contentHeight: mainColumn.height
+        clip: true
+        
+        // 垂直滚动条
+        ScrollBar.vertical: ScrollBar {
+            policy: ScrollBar.AsNeeded
+            width: 8
+            hoverEnabled: true
+            
+            background: Rectangle {
+                color: "#1e1e1e"
+                radius: 4
+            }
+            
+            contentItem: Rectangle {
+                color: "#3b82f6"
+                radius: 4
+            }
+        }
+        
+        ColumnLayout {
+            id: mainColumn
+            width: pageFlickable.width - 10 // 减去滚动条宽度和边距
+            spacing: 20
         
         // 模型卡
         Rectangle {
@@ -252,7 +380,7 @@ Rectangle {
         // 版本部分
         Rectangle {
             Layout.fillWidth: true
-            Layout.preferredHeight: 100 + (modelVersions.length * 50)
+            Layout.preferredHeight: 110 + (modelVersions.length * 50)
             color: "#1e1e1e"
             radius: 12
             border {
@@ -270,35 +398,48 @@ Rectangle {
                     Layout.fillWidth: true
                     spacing: 10
                     
-                    Canvas {
-                        width: 20
-                        height: 20
-                        Layout.alignment: Qt.AlignVCenter
-                        
-                        onPaint: {
-                            var ctx = getContext("2d")
-                            ctx.clearRect(0, 0, width, height)
-                            ctx.strokeStyle = "#3b82f6"
-                            ctx.lineWidth = 2
-                            ctx.beginPath()
-                            ctx.moveTo(width * 0.2, height * 0.2)
-                            ctx.lineTo(width * 0.8, height * 0.2)
-                            ctx.lineTo(width * 0.8, height * 0.8)
-                            ctx.lineTo(width * 0.2, height * 0.8)
-                            ctx.closePath()
-                            ctx.stroke()
-                            ctx.beginPath()
-                            ctx.moveTo(width * 0.2, height * 0.5)
-                            ctx.lineTo(width * 0.8, height * 0.5)
-                            ctx.stroke()
-                        }
-                    }
-                    
                     Label {
                         text: "版本"
                         font.pointSize: 14
                         font.bold: true
                         color: "#ffffff"
+                    }
+                    
+                    // 占位符，将按钮推到右侧
+                    Item {
+                        Layout.fillWidth: true
+                    }
+                    
+                    // 获取所有按钮容器（与下方操作列宽度一致）
+                    Item {
+                        width: 100
+                        Layout.alignment: Qt.AlignVCenter
+                        
+                        // 获取所有按钮
+                    Rectangle {
+                        width: 80
+                        height: 32
+                        color: "#3b82f6"
+                        radius: 6
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.verticalCenter: parent.verticalCenter
+                        
+                        MouseArea {
+                            anchors.fill: parent
+                            onClicked: {
+                                // 导航到所有版本页面
+                                modelDetailPage.pageChanged("modelAllVersions")
+                            }
+                        }
+                        
+                        Label {
+                            anchors.centerIn: parent
+                            text: "获取所有"
+                            color: "#ffffff"
+                            font.pointSize: 11
+                            font.bold: true
+                        }
+                    }
                     }
                 }
                 
@@ -451,7 +592,7 @@ Rectangle {
                                                         if (modelData.version) {
                                                             fullModelName += ":" + modelData.version
                                                         }
-                                                        console.log("Pull model:", fullModelName)
+                                                        // console.log("Pull model:", fullModelName)
                                                         // 显示拉取提示弹窗
                                                         showPullConfirmation(fullModelName)
                                                     }
@@ -493,7 +634,7 @@ Rectangle {
         // 描述部分
         Rectangle {
             Layout.fillWidth: true
-            Layout.minimumHeight: 300
+            Layout.preferredHeight: contentColumn.height
             color: "#1e1e1e"
             radius: 12
             border {
@@ -501,39 +642,16 @@ Rectangle {
                 color: "#333333"
             }
             
-            ColumnLayout {
-                anchors.fill: parent
-                anchors.margins: 15
+            Column {
+                id: contentColumn
+                width: parent.width
+                padding: 15
                 spacing: 15
                 
                 // 标题
-                RowLayout {
-                    Layout.fillWidth: true
+                Row {
+                    width: parent.width
                     spacing: 10
-                    
-                    Canvas {
-                        width: 20
-                        height: 20
-                        Layout.alignment: Qt.AlignVCenter
-                        
-                        onPaint: {
-                            var ctx = getContext("2d")
-                            ctx.clearRect(0, 0, width, height)
-                            ctx.strokeStyle = "#3b82f6"
-                            ctx.lineWidth = 2
-                            ctx.beginPath()
-                            ctx.arc(width * 0.5, height * 0.5, width * 0.4, 0, Math.PI * 2)
-                            ctx.stroke()
-                            ctx.beginPath()
-                            ctx.moveTo(width * 0.5, height * 0.2)
-                            ctx.lineTo(width * 0.5, height * 0.8)
-                            ctx.stroke()
-                            ctx.beginPath()
-                            ctx.moveTo(width * 0.2, height * 0.5)
-                            ctx.lineTo(width * 0.8, height * 0.5)
-                            ctx.stroke()
-                        }
-                    }
                     
                     Label {
                         text: "描述"
@@ -543,161 +661,18 @@ Rectangle {
                     }
                 }
                 
-                // 描述内容
-                Rectangle {
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    color: "transparent"
-                    
-                    Flickable {
-                        anchors.fill: parent
-                        contentWidth: parent.width
-                        contentHeight: descriptionContent.height
-                        clip: true
-                        interactive: contentHeight > height
-                        
-                        // 垂直滚动条
-                        ScrollBar.vertical: ScrollBar {
-                            policy: ScrollBar.AlwaysOn
-                            width: 8
-                            hoverEnabled: true
-                            
-                            background: Rectangle {
-                                color: "#1e1e1e"
-                                radius: 4
-                            }
-                            
-                            contentItem: Rectangle {
-                                color: "#3b82f6"
-                                radius: 4
-                            }
-                        }
-                        
-                        Column {
-                            id: descriptionContent
-                            width: parent.width
-                            spacing: 15
-                            
-                            // 模型描述文本
-                            Label {
-                                width: parent.width
-                                text: modelDescription || (currentModelData ? currentModelData.description : "无详细描述")
-                                font.pointSize: 12
-                                color: "#9ca3af"
-                                wrapMode: Text.WordWrap
-                                lineHeight: 1.4
-                            }
-                            
-                            // 示例图表区域（模拟）
-                            Rectangle {
-                                width: parent.width
-                                height: 200
-                                color: "#1a1a1a"
-                                radius: 8
-                                border {
-                                    width: 1
-                                    color: "#2d2d2d"
-                                }
-                                
-                                Column {
-                                    anchors.fill: parent
-                                    anchors.margins: 15
-                                    spacing: 10
-                                    
-                                    Label {
-                                        width: parent.width
-                                        text: "模型性能对比"
-                                        font.pointSize: 14
-                                        font.bold: true
-                                        color: "#ffffff"
-                                    }
-                                    
-                                    // 模拟图表
-                                    Canvas {
-                                        width: parent.width
-                                        height: 150
-                                        
-                                        onPaint: {
-                                            var ctx = getContext("2d")
-                                            ctx.clearRect(0, 0, width, height)
-                                            
-                                            // 绘制坐标轴
-                                            ctx.strokeStyle = "#333333"
-                                            ctx.lineWidth = 1
-                                            ctx.beginPath()
-                                            ctx.moveTo(50, 10)
-                                            ctx.lineTo(50, height - 10)
-                                            ctx.lineTo(width - 10, height - 10)
-                                            ctx.stroke()
-                                            
-                                            // 绘制柱状图
-                                            var bars = [
-                                                { name: "Model A", value: 85, color: "#3b82f6" },
-                                                { name: "Model B", value: 75, color: "#10b981" },
-                                                { name: "Model C", value: 65, color: "#f59e0b" }
-                                            ]
-                                            
-                                            var barWidth = (width - 120) / bars.length
-                                            var barSpacing = 20
-                                            
-                                            for (var i = 0; i < bars.length; i++) {
-                                                var barHeight = (bars[i].value / 100) * (height - 40)
-                                                var x = 70 + i * (barWidth + barSpacing)
-                                                var y = height - 10 - barHeight
-                                                
-                                                ctx.fillStyle = bars[i].color
-                                                ctx.fillRect(x, y, barWidth, barHeight)
-                                                
-                                                ctx.fillStyle = "#9ca3af"
-                                                ctx.font = "10px Arial"
-                                                ctx.textAlign = "center"
-                                                ctx.fillText(bars[i].name, x + barWidth / 2, height - 2)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                // 描述内容 - 移除内部 Flickable，使用页面级滚动
+                Text {
+                    width: parent.width
+                    text: modelDescription || (currentModelData ? currentModelData.description : "无详细描述")
+                    textFormat: Text.RichText
+                    font.pointSize: 12
+                    color: "#9ca3af"
+                    wrapMode: Text.WordWrap
+                    lineHeight: 1.4
+                    onLinkActivated: function(link) {
+                        Qt.openUrlExternally(link)
                     }
-                }
-            }
-        }
-        
-        // 加载状态
-        Rectangle {
-            id: loadingIndicator
-            width: parent.width
-            height: parent.height
-            color: "#121212"
-            opacity: 0.8
-            visible: isLoading
-            
-            ColumnLayout {
-                anchors.fill: parent
-                spacing: 15
-                
-                // 加载动画
-                Canvas {
-                    width: 40
-                    height: 40
-                    Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
-                    
-                    onPaint: {
-                        var ctx = getContext("2d")
-                        ctx.clearRect(0, 0, width, height)
-                        ctx.strokeStyle = "#3b82f6"
-                        ctx.lineWidth = 3
-                        ctx.beginPath()
-                        ctx.arc(width/2, height/2, width/3, 0, Math.PI*2)
-                        ctx.stroke()
-                    }
-                }
-                
-                Label {
-                    text: "加载中..."
-                    color: "#ffffff"
-                    font.pointSize: 14
-                    Layout.alignment: Qt.AlignHCenter
                 }
             }
         }
@@ -743,6 +718,54 @@ Rectangle {
                         font.bold: true
                     }
                 }
+            }
+        }
+    }
+    }
+    
+    // 加载状态 - 改为类似设置页保存提示的样式
+    Rectangle {
+        id: loadingIndicator
+        width: 200
+        height: 50
+        color: "#3b82f6"
+        radius: 8
+        border {
+            width: 1
+            color: "#60a5fa"
+        }
+        opacity: 1
+        visible: isLoading
+        anchors.centerIn: parent
+        z: 9999
+        
+        RowLayout {
+            anchors.fill: parent
+            anchors.margins: 15
+            spacing: 10
+            
+            // 加载动画
+            Canvas {
+                width: 20
+                height: 20
+                Layout.alignment: Qt.AlignVCenter
+                
+                onPaint: {
+                    var ctx = getContext("2d")
+                    ctx.clearRect(0, 0, width, height)
+                    ctx.strokeStyle = "#ffffff"
+                    ctx.lineWidth = 2
+                    ctx.beginPath()
+                    ctx.arc(width/2, height/2, width/3, 0, Math.PI*2)
+                    ctx.stroke()
+                }
+            }
+            
+            Label {
+                text: "加载中..."
+                color: "#ffffff"
+                font.pointSize: 14
+                Layout.alignment: Qt.AlignVCenter
             }
         }
     }
@@ -811,12 +834,15 @@ Rectangle {
                     radius: 8
                     Layout.alignment: Qt.AlignHCenter
                     
+
                     MouseArea {
                         anchors.fill: parent
                         onClicked: {
                             closePullDialog()
+                            // 不跳转到下载管理页面
                         }
                     }
+
                     
                     Label {
                         anchors.centerIn: parent

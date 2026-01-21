@@ -7,7 +7,7 @@ Item {
     id: delegateRoot
     signal deleteRequested(string modelName)
 
-    width: modelList.colWidth1 + 15 + modelList.colWidth4 + 15 + modelList.colWidth2 + 15 + modelList.colWidth3 + 15 + modelList.colWidth5 + 15 + modelList.colWidth6
+    width: modelList.totalColumnWidth
     height: 45
 
     Rectangle {
@@ -51,18 +51,6 @@ Item {
                 }
             }
 
-            // 分隔符1
-            Item {
-                Layout.preferredWidth: 15
-                Layout.fillHeight: true
-                Rectangle {
-                    anchors.centerIn: parent
-                    width: 1
-                    height: parent.height
-                    color: "#444444"
-                }
-            }
-
             Item {
                 Layout.preferredWidth: modelList.colWidth4
                 Layout.fillHeight: true
@@ -74,18 +62,6 @@ Item {
                     verticalAlignment: Text.AlignVCenter
                     horizontalAlignment: Text.AlignHCenter
                     elide: Text.ElideRight
-                }
-            }
-
-            // 分隔符2
-            Item {
-                Layout.preferredWidth: 15
-                Layout.fillHeight: true
-                Rectangle {
-                    anchors.centerIn: parent
-                    width: 1
-                    height: parent.height
-                    color: "#444444"
                 }
             }
 
@@ -102,18 +78,6 @@ Item {
                 }
             }
 
-            // 分隔符3
-            Item {
-                Layout.preferredWidth: 15
-                Layout.fillHeight: true
-                Rectangle {
-                    anchors.centerIn: parent
-                    width: 1
-                    height: parent.height
-                    color: "#444444"
-                }
-            }
-
             Item {
                 Layout.preferredWidth: modelList.colWidth3
                 Layout.fillHeight: true
@@ -127,18 +91,6 @@ Item {
                 }
             }
 
-            // 分隔符4
-            Item {
-                Layout.preferredWidth: 15
-                Layout.fillHeight: true
-                Rectangle {
-                    anchors.centerIn: parent
-                    width: 1
-                    height: parent.height
-                    color: "#444444"
-                }
-            }
-
             Item {
                 Layout.preferredWidth: modelList.colWidth5
                 Layout.fillHeight: true
@@ -149,18 +101,6 @@ Item {
                     font.pointSize: 11
                     verticalAlignment: Text.AlignVCenter
                     horizontalAlignment: Text.AlignHCenter
-                }
-            }
-
-            // 分隔符5
-            Item {
-                Layout.preferredWidth: 15
-                Layout.fillHeight: true
-                Rectangle {
-                    anchors.centerIn: parent
-                    width: 1
-                    height: parent.height
-                    color: "#444444"
                 }
             }
 

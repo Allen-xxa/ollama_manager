@@ -5,4 +5,14 @@ __pycache__/
 .trae/
 
 # Configuration
-config.json
+config/
+#构建工具
+build/
+#Python虚拟环境
+.venv/
+#计划任务
+plans/
+#发布目录
+dist/
+#简单构建脚本
+build_simple.ps1

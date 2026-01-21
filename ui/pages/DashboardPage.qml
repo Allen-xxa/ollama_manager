@@ -4,7 +4,7 @@ import QtQuick.Layouts 1.15
 
 Rectangle {
     id: dashboardPage
-    property string currentPage: "modelManager"
+    property string currentPage: "dashboard"
     width: parent.width
     height: parent.height
     color: "#121212"
@@ -13,7 +13,7 @@ Rectangle {
     Image {
         id: backgroundImage
         anchors.fill: parent
-        source: "../img/bg.jpg"
+        source: "../assets/img/bg.jpg"
         fillMode: Image.PreserveAspectCrop
         anchors.centerIn: parent
         opacity: 0.3 // 调整透明度以确保内容清晰可见

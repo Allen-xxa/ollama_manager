@@ -5,6 +5,8 @@ import QtQuick.Layouts 1.15
 Rectangle {
     id: downloadManagerPage
     property string currentPage: "downloadManager"
+    property string deleteModelName: ""
+    property bool showDeleteDialog: false
     width: parent.width
     height: parent.height
     color: "#121212"
@@ -34,25 +36,25 @@ Rectangle {
     function loadDownloadTasksFromFile() {
         // 从modelManager直接读取JSON文件
         var tasks = modelManager.loadDownloadTasksFromFile()
-        console.log("loadDownloadTasksFromFile - tasks:", tasks)
-        console.log("loadDownloadTasksFromFile - tasks.length:", tasks ? tasks.length : 0)
-        console.log("loadDownloadTasksFromFile - tasks type:", typeof tasks)
+        // console.log("loadDownloadTasksFromFile - tasks:", tasks)
+        // console.log("loadDownloadTasksFromFile - tasks.length:", tasks ? tasks.length : 0)
+        // console.log("loadDownloadTasksFromFile - tasks type:", typeof tasks)
         
         // 创建新数组并重新赋值，触发属性变化通知
         var newTasks = []
         if (tasks && tasks.length > 0) {
             // 添加所有下载任务
             for (var i = 0; i < tasks.length; i++) {
-                console.log("Adding task:", tasks[i])
+                // console.log("Adding task:", tasks[i])
                 newTasks.push(tasks[i])
             }
         } else {
-            console.log("No tasks found or tasks is empty")
+            // console.log("No tasks found or tasks is empty")
         }
         
         // 重新赋值整个数组，触发属性变化
         downloadTasks = newTasks
-        console.log("Final downloadTasks.length:", downloadTasks.length)
+        // console.log("Final downloadTasks.length:", downloadTasks.length)
         
         isLoading = false
         errorMessage = ""
@@ -79,8 +81,8 @@ Rectangle {
         errorMessage = ""
     }
     
-    // 取消下载任务
-    function cancelDownload(modelName) {
+    // 删除下载任务
+    function deleteDownload(modelName) {
         modelManager.cancelDownload(modelName)
     }
     
@@ -94,12 +96,31 @@ Rectangle {
         modelManager.resumeDownload(modelName)
     }
     
+    // 显示删除确认对话框
+    function showDeleteConfirmation(modelName) {
+        deleteModelName = modelName
+        showDeleteDialog = true
+    }
+    
+    // 关闭删除确认对话框
+    function closeDeleteDialog() {
+        showDeleteDialog = false
+        deleteModelName = ""
+    }
+    
+    // 确认删除下载任务
+    function confirmDelete() {
+        deleteDownload(deleteModelName)
+        closeDeleteDialog()
+    }
+    
     // 连接到modelManager的信号
     Connections {
         target: modelManager
         
         // 下载任务状态更新信号
         function onDownloadTaskUpdated(task) {
+            console.log("Task updated:", task.modelName, "Status:", task.status)
             // 查找任务在列表中的位置
             var taskIndex = -1
             for (var i = 0; i < downloadTasks.length; i++) {
@@ -109,32 +130,68 @@ Rectangle {
                 }
             }
             
+            // 创建新数组并重新赋值，触发属性变化通知
+            var newTasks = []
             if (taskIndex !== -1) {
                 // 更新现有任务
-                downloadTasks[taskIndex] = task
+                for (var i = 0; i < downloadTasks.length; i++) {
+                    if (i === taskIndex) {
+                        newTasks.push(task)
+                    } else {
+                        newTasks.push(downloadTasks[i])
+                    }
+                }
                 
                 // 如果任务已完成或取消，从列表中移除
                 if (task.status === "completed" || task.status === "cancelled") {
-                    downloadTasks.splice(taskIndex, 1)
+                    console.log("Removing task:", task.modelName, "Status:", task.status)
+                    newTasks.splice(taskIndex, 1)
                 }
             } else {
                 // 添加新任务（非已完成或取消状态）
                 if (task.status !== "completed" && task.status !== "cancelled") {
-                    downloadTasks.push(task)
+                    console.log("Adding new task:", task.modelName, "Status:", task.status)
+                    newTasks = downloadTasks.slice()
+                    newTasks.push(task)
+                } else {
+                    newTasks = downloadTasks.slice()
                 }
             }
+            
+            console.log("New tasks length:", newTasks.length)
+            // 重新赋值整个数组，触发属性变化
+            downloadTasks = newTasks
         }
         
         // 下载进度更新信号
         function onDownloadProgressUpdated(modelName, progress, speed, eta) {
             // 查找并更新对应任务的进度
+            var taskIndex = -1
             for (var i = 0; i < downloadTasks.length; i++) {
                 if (downloadTasks[i].modelName === modelName) {
-                    downloadTasks[i].progress = progress
-                    downloadTasks[i].speed = speed
-                    downloadTasks[i].eta = eta
+                    taskIndex = i
                     break
                 }
+            }
+            
+            if (taskIndex !== -1) {
+                // 创建新数组并重新赋值，触发属性变化通知
+                var newTasks = []
+                for (var i = 0; i < downloadTasks.length; i++) {
+                    if (i === taskIndex) {
+                        // 更新找到的任务
+                        var updatedTask = downloadTasks[i]
+                        updatedTask.progress = progress
+                        updatedTask.speed = speed
+                        updatedTask.eta = eta
+                        newTasks.push(updatedTask)
+                    } else {
+                        newTasks.push(downloadTasks[i])
+                    }
+                }
+                
+                // 重新赋值整个数组，触发属性变化
+                downloadTasks = newTasks
             }
         }
     }
@@ -407,18 +464,18 @@ Rectangle {
                                             Layout.fillWidth: true
                                         }
                                         
-                                        // 暂停/恢复按钮（仅当下载中或暂停时显示）
+                                        // 暂停/恢复按钮（仅当下载中、排队中或暂停时显示）
                                         Rectangle {
                                             width: 100
                                             height: 36
-                                            color: modelData.status === "downloading" ? "#f59e0b" : "#10b981"
+                                            color: modelData.status === "downloading" || modelData.status === "queued" ? "#f59e0b" : "#10b981"
                                             radius: 6
-                                            visible: modelData.status === "downloading" || modelData.status === "paused"
+                                            visible: modelData.status === "downloading" || modelData.status === "paused" || modelData.status === "queued"
                                             
                                             MouseArea {
                                                 anchors.fill: parent
                                                 onClicked: {
-                                                    if (modelData.status === "downloading") {
+                                                    if (modelData.status === "downloading" || modelData.status === "queued") {
                                                         pauseDownload(modelData.modelName)
                                                     } else if (modelData.status === "paused") {
                                                         resumeDownload(modelData.modelName)
@@ -428,7 +485,7 @@ Rectangle {
                                             
                                             Label {
                                                 anchors.centerIn: parent
-                                                text: modelData.status === "downloading" ? "暂停" : "恢复"
+                                                text: modelData.status === "downloading" || modelData.status === "queued" ? "暂停" : "恢复"
                                                 color: "#ffffff"
                                                 font.pointSize: 12
                                                 font.bold: true
@@ -459,7 +516,7 @@ Rectangle {
                                             }
                                         }
                                         
-                                        // 取消下载按钮
+                                        // 删除下载按钮
                                         Rectangle {
                                             width: 100
                                             height: 36
@@ -470,13 +527,13 @@ Rectangle {
                                             MouseArea {
                                                 anchors.fill: parent
                                                 onClicked: {
-                                                    cancelDownload(modelData.modelName)
+                                                    showDeleteConfirmation(modelData.modelName)
                                                 }
                                             }
                                             
                                             Label {
                                                 anchors.centerIn: parent
-                                                text: "取消"
+                                                text: "删除"
                                                 color: "#ffffff"
                                                 font.pointSize: 12
                                                 font.bold: true
@@ -513,6 +570,121 @@ Rectangle {
                         color: "#6b7280"
                         font.pointSize: 12
                         horizontalAlignment: Text.AlignHCenter
+                    }
+                }
+            }
+        }
+    }
+    
+    // 删除确认对话框
+    Item {
+        id: deleteDialogOverlay
+        visible: showDeleteDialog
+        anchors.fill: parent
+        z: 9999
+        
+        Rectangle {
+            anchors.fill: parent
+            color: "#000000"
+            opacity: 0.5
+            
+            MouseArea {
+                anchors.fill: parent
+                onClicked: closeDeleteDialog()
+            }
+        }
+        
+        Rectangle {
+            width: 400
+            height: 200
+            color: "#1e1e1e"
+            radius: 12
+            border {
+                width: 1
+                color: "#333333"
+            }
+            anchors.centerIn: parent
+            
+            ColumnLayout {
+                anchors.fill: parent
+                anchors.margins: 20
+                spacing: 20
+                
+                Label {
+                    Layout.fillWidth: true
+                    text: "删除下载任务"
+                    font.pointSize: 16
+                    font.bold: true
+                    color: "#ffffff"
+                    horizontalAlignment: Text.AlignHCenter
+                }
+                
+                Label {
+                    Layout.fillWidth: true
+                    text: "确定要删除 " + deleteModelName + " 吗？"
+                    font.pointSize: 14
+                    color: "#9ca3af"
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                }
+                
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 15
+                    
+                    Item {
+                        Layout.fillWidth: true
+                    }
+                    
+                    Rectangle {
+                        width: 100
+                        height: 40
+                        color: "#2a2a2a"
+                        radius: 8
+                        border {
+                            width: 1
+                            color: "#333333"
+                        }
+                        
+                        MouseArea {
+                            anchors.fill: parent
+                            onClicked: closeDeleteDialog()
+                        }
+                        
+                        Label {
+                            anchors.centerIn: parent
+                            text: "取消"
+                            color: "#ffffff"
+                            font.pointSize: 14
+                        }
+                    }
+                    
+                    Rectangle {
+                        width: 100
+                        height: 40
+                        color: "#ff6b6b"
+                        radius: 8
+                        border {
+                            width: 1
+                            color: "#ff8787"
+                        }
+                        
+                        MouseArea {
+                            anchors.fill: parent
+                            onClicked: confirmDelete()
+                        }
+                        
+                        Label {
+                            anchors.centerIn: parent
+                            text: "确认"
+                            color: "#ffffff"
+                            font.pointSize: 14
+                            font.bold: true
+                        }
+                    }
+                    
+                    Item {
+                        Layout.fillWidth: true
                     }
                 }
             }

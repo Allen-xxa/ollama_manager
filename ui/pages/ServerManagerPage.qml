@@ -9,9 +9,6 @@ Rectangle {
     height: parent.height
     color: "#121212"
     
-    // 存储服务器数据的数组
-    property var serverData: []
-    
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 20
@@ -209,7 +206,7 @@ Rectangle {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     spacing: 0
-                    model: modelManager.servers
+                    model: modelManager ? modelManager.servers : []
                     clip: true
                     ScrollBar.vertical: ScrollBar {
                         policy: ScrollBar.AlwaysOn
@@ -339,6 +336,7 @@ Rectangle {
                                         width: 80
                                         height: 28
                                         onClicked: {
+                                            // 先设置服务器为活跃
                                             modelManager.setActiveServer(index)
                                         }
                                         background: Rectangle {
@@ -560,19 +558,22 @@ Rectangle {
                 }
 
                 Button {
-                    text: "保存"
-                    onClicked: {
-                        if (newServerName.text && newServerAddress.text && newServerPort.text) {
-                            // 添加新服务器
-                            modelManager.addServer(newServerName.text, newServerAddress.text, newServerPort.text)
-                            
-                            // 清空输入
-                            newServerName.text = ""
-                            newServerAddress.text = ""
-                            newServerPort.text = ""
-                            newServerDialog.visible = false
-                        }
-                    }
+                                text: "保存"
+                                onClicked: {
+                                    if (newServerName.text && newServerAddress.text && newServerPort.text) {
+                                        // 添加新服务器
+                                        modelManager.addServer(newServerName.text, newServerAddress.text, newServerPort.text)
+                                        
+                                        // 立即测试新服务器连接
+                                        modelManager.testServerConnectionAsync(newServerAddress.text, newServerPort.text)
+                                        
+                                        // 清空输入
+                                        newServerName.text = ""
+                                        newServerAddress.text = ""
+                                        newServerPort.text = ""
+                                        newServerDialog.visible = false
+                                    }
+                                }
                     background: Rectangle {
                         color: "#4ecdc4"
                         radius: 8
@@ -745,6 +746,9 @@ Rectangle {
                         if (editServerName.text && editServerAddress.text && editServerPort.text) {
                             // 更新服务器信息
                             modelManager.updateServer(editServerDialog.serverIndex, editServerName.text, editServerAddress.text, editServerPort.text)
+                            
+                            // 立即测试更新后的服务器连接
+                            modelManager.testServerConnectionAsync(editServerAddress.text, editServerPort.text)
                             
                             // 清空输入
                             editServerName.text = ""
