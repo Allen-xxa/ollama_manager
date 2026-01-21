@@ -2,7 +2,7 @@
 
 一个基于 PyQt6 和 QML 的 Ollama 模型管理工具，提供图形化界面来管理本地和远程 Ollama 服务器上的模型。
 
-# Ollama 模型管理器启动界面预览
+## 启动界面预览
 
 ![alt text](image.png)
 
