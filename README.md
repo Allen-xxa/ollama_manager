@@ -107,7 +107,7 @@ Ollama Manager/
 
 配置文件位于 `config/` 目录：
 
-- `server.json`: 服务器配置，包括服务器地址、端口和服务器列表
+- `config.json`: 服务器配置，包括服务器地址、端口和服务器列表
 - `download_tasks.json`: 下载任务配置，保存下载任务状态
 
 ## 开发说明
