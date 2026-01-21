@@ -16,3 +16,9 @@ plans/
 dist/
 #简单构建脚本
 build_simple.ps1
+
+#临时目录
+temp/
+
+#编译脚本
+OllamaManager.spec

@@ -1,47 +1,60 @@
 # Ollama 模型管理器
 
 一个基于 PyQt6 和 QML 的 Ollama 模型管理工具，提供图形化界面来管理本地和远程 Ollama 服务器上的模型。
-
+![alt text](image.png)
 ## 功能特性
 
 - **仪表盘**: 查看系统概览，包括活跃模型数、磁盘使用、显存使用等
 - **模型管理**: 本地模型的增删改查，支持模型更新和卸载
 - **模型库**: 浏览 Ollama 官方模型库，支持搜索和分页
 - **模型详情**: 查看模型的详细信息、版本列表和描述
+- **模型版本**: 查看模型的所有可用版本
 - **下载管理**: 管理模型下载任务，支持暂停、恢复、取消操作
 - **服务器管理**: 管理多个 Ollama 服务器，支持连接测试和切换
+- **翻译功能**: 支持 Google 翻译和 Ollama 本地模型翻译
+- **设置管理**: 管理应用设置，包括翻译配置等
+- **深色标题栏**: Windows 平台支持深色标题栏
 
 ## 项目结构
 
 ```
 Ollama Manager/
 ├── src/                      # 源代码目录
-│   ├── main.py             # 应用入口
-│   └── model_manager.py    # 模型管理核心逻辑
+│   ├── __init__.py          # 版本信息
+│   ├── main.py              # 应用入口
+│   ├── model_manager.py     # 模型管理核心逻辑
+│   └── dark_title_bar.py    # Windows 深色标题栏支持
 ├── ui/                       # 用户界面目录
-│   ├── main.qml            # 主界面
-│   ├── components/         # UI组件
+│   ├── main.qml             # 主界面
+│   ├── components/          # UI组件
 │   │   ├── NavBar.qml
 │   │   └── ModelManager/
 │   │       ├── Delegate.qml
 │   │       └── ModelManagerPage.qml
-│   ├── pages/              # 页面
-│   │   ├── DashboardPage.qml
-│   │   ├── ModelLibraryPage.qml
-│   │   ├── ModelDetailPage.qml
-│   │   ├── DownloadManagerPage.qml
-│   │   └── SettingsPage.qml
-│   ├── utils/              # 工具函数
+│   ├── pages/               # 页面
+│   │   ├── DashboardPage.qml        # 仪表盘
+│   │   ├── ModelLibraryPage.qml     # 模型库
+│   │   ├── ModelDetailPage.qml      # 模型详情
+│   │   ├── ModelAllVersionsPage.qml # 模型所有版本
+│   │   ├── DownloadManagerPage.qml  # 下载管理
+│   │   ├── ServerManagerPage.qml    # 服务器管理
+│   │   ├── SettingsPage.qml         # 设置
+│   │   ├── AboutPage.qml            # 关于
+│   │   ├── AddAssistantPage.qml    # 添加助手（开发中）
+│   │   └── DefaultAssistantPage.qml # 默认助手（开发中）
+│   ├── utils/               # 工具函数
 │   │   └── Utils.js
-│   └── assets/             # 资源文件
-│       ├── img/            # 图片
+│   └── assets/              # 资源文件
+│       ├── img/             # 图片
 │       └── fonts/          # 字体
-├── config/                   # 配置文件目录
+├── config/                   # 配置文件目录（运行时自动创建）
 │   ├── server.json          # 服务器配置
-│   └── download_tasks.json # 下载任务
+│   ├── download_tasks.json  # 下载任务
+│   └── config.json          # 应用设置
 ├── tests/                    # 测试目录（待实现）
 ├── docs/                     # 文档目录（待实现）
 ├── requirements.txt           # Python依赖
+├── ollama.png                # 应用图标
 └── README.md                 # 项目说明文档
 ```
 
@@ -93,22 +106,36 @@ Ollama Manager/
 #### 模型下载
 - 从 Ollama 官方模型库浏览和搜索模型
 - 查看模型详情和版本信息
+- 查看模型的所有可用版本
 - 添加模型到下载队列
 - 暂停、恢复、取消下载任务
 - 查看下载进度、速度和预估时间
+- 支持断点续传
 
 #### 服务器管理
 - 添加多个 Ollama 服务器
-- 测试服务器连接状态
+- 测试服务器连接状态和延迟
 - 切换活跃服务器
 - 编辑和删除服务器配置
 
+#### 翻译功能
+- 支持 Google 翻译
+- 支持 Ollama 本地模型翻译
+- 翻译缓存机制，提高翻译效率
+- 可自定义翻译提示词
+
+#### 设置管理
+- 管理翻译设置
+- 选择翻译方式（Google/Ollama）
+- 配置 Ollama 翻译模型和提示词
+
 ## 配置说明
 
-配置文件位于 `config/` 目录：
+配置文件位于 `config/` 目录（首次运行时自动创建）：
 
-- `config.json`: 服务器配置，包括服务器地址、端口和服务器列表
+- `server.json`: 服务器配置，包括服务器地址、端口和服务器列表
 - `download_tasks.json`: 下载任务配置，保存下载任务状态
+- `config.json`: 应用设置，包括翻译配置等
 
 ## 开发说明
 
@@ -123,17 +150,9 @@ Ollama Manager/
 
 - **src/main.py**: 应用入口，初始化 QML 引擎和加载界面
 - **src/model_manager.py**: 核心业务逻辑，处理所有 API 调用和数据管理
+- **src/dark_title_bar.py**: Windows 平台深色标题栏支持
+- **src/__init__.py**: 版本信息定义
 - **ui/**: QML 界面文件，使用 Qt Quick 构建 UI
-
-### 信号与槽
-
-项目使用 PyQt6 的信号与槽机制进行组件间通信：
-
-- `modelsUpdated`: 模型列表更新信号
-- `statusUpdated`: 状态更新信号
-- `downloadTaskUpdated`: 下载任务更新信号
-- `downloadProgressUpdated`: 下载进度更新信号
-- `serversUpdated`: 服务器列表更新信号
 
 ## 常见问题
 
@@ -162,6 +181,18 @@ Ollama Manager/
 欢迎提交 Issue 和 Pull Request！
 
 ## 更新日志
+
+### v1.1.0 (2026-01-21)
+- 新增模型所有版本查看功能
+- 新增翻译功能（支持 Google 翻译和 Ollama 本地翻译）
+- 新增设置管理功能
+- 新增关于页面
+- 新增 Windows 深色标题栏支持
+- 优化下载管理，支持断点续传
+- 新增服务器连接延迟测试
+- 新增活跃模型详细信息显示
+- 新增磁盘和显存使用情况显示
+- 优化翻译缓存机制
 
 ### v1.0.0 (2026-01-20)
 - 初始版本发布
