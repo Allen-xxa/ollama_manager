@@ -3,8 +3,36 @@ import json
 import os
 import sys
 import weakref
+import subprocess
+import platform
 from bs4 import BeautifulSoup
 from PyQt6.QtCore import QObject, pyqtSignal, QRunnable, QThreadPool, QMetaObject, Qt, Q_ARG, pyqtProperty, pyqtSlot
+
+def execute_command(command):
+    """执行命令并返回结果"""
+    try:
+        if platform.system() == 'Windows':
+            process = subprocess.Popen(
+                command,
+                shell=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                creationflags=subprocess.CREATE_NO_WINDOW
+            )
+        else:
+            process = subprocess.Popen(
+                command,
+                shell=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+        
+        stdout, stderr = process.communicate(timeout=30)
+        return process.returncode, stdout, stderr
+    except Exception as e:
+        return -1, "", str(e)
 
 class ModelManager(QObject):
     modelsUpdated = pyqtSignal(list)
@@ -25,6 +53,7 @@ class ModelManager(QObject):
     modelAllVersionsUpdated = pyqtSignal(list)  # 模型所有版本更新信号 (版本列表)
     modelAllVersionsStatusUpdated = pyqtSignal(str)  # 模型所有版本状态更新信号
     settingsUpdated = pyqtSignal()  # 设置更新信号
+    unloadModelResult = pyqtSignal(bool, str)  # 模型卸载结果信号 (成功状态, 消息)
 
     def __init__(self):
         super().__init__()
@@ -986,19 +1015,125 @@ class ModelManager(QObject):
         """卸载运行中的模型"""
         try:
             self.statusUpdated.emit("卸载模型")
-            # 使用正确的API端点卸载模型
-            response = requests.post(f"{self.apiUrl}/generate", json={
-                "model": model_name,
-                "prompt": "",
-                "keep_alive": "0"
-            }, timeout=2)
-            if response.status_code == 200:
-                self.statusUpdated.emit("模型卸载成功")
+            
+            # 尝试使用专门的卸载端点
+            api_success = False
+            try:
+                # 尝试常见的卸载端点
+                endpoints = [
+                    f"{self.apiUrl}/unload",
+                    f"{self.apiUrl}/models/unload",
+                    f"{self.apiUrl}/model/unload"
+                ]
+                
+                for endpoint in endpoints:
+                    try:
+                        response = requests.post(endpoint, json={
+                            "name": model_name
+                        }, timeout=2)
+                        
+                        if response.status_code == 200:
+                            self.statusUpdated.emit("模型卸载成功 (API)")
+                            self.getModels()
+                            api_success = True
+                            QMetaObject.invokeMethod(self, "unloadModelResult", Qt.ConnectionType.QueuedConnection,
+                                                 Q_ARG(bool, True),
+                                                 Q_ARG(str, "模型卸载成功 (API)"))
+                            return
+                    except:
+                        continue
+            except Exception as api_error:
+                self.statusUpdated.emit(f"尝试专用 API 失败: {str(api_error)}")
+            
+            # API 失败，尝试当前实现
+            if not api_success:
+                try:
+                    response = requests.post(f"{self.apiUrl}/generate", json={
+                        "model": model_name,
+                        "prompt": "",
+                        "keep_alive": "0"
+                    }, timeout=2)
+                    
+                    if response.status_code == 200:
+                        self.statusUpdated.emit("模型卸载成功")
+                        self.getModels()
+                        QMetaObject.invokeMethod(self, "unloadModelResult", Qt.ConnectionType.QueuedConnection,
+                                             Q_ARG(bool, True),
+                                             Q_ARG(str, "模型卸载成功"))
+                        return
+                except Exception as generate_error:
+                    self.statusUpdated.emit(f"尝试 generate API 失败: {str(generate_error)}")
+            
+            # 回退到 CLI
+            command = f"ollama rm {model_name}"
+            returncode, stdout, stderr = execute_command(command)
+            
+            if returncode == 0:
+                self.statusUpdated.emit("模型卸载成功 (CLI)")
                 self.getModels()
+                QMetaObject.invokeMethod(self, "unloadModelResult", Qt.ConnectionType.QueuedConnection,
+                                         Q_ARG(bool, True),
+                                         Q_ARG(str, "模型卸载成功 (CLI)"))
             else:
-                self.statusUpdated.emit("卸载模型失败")
+                error_msg = stderr.strip() if stderr else "卸载失败"
+                self.statusUpdated.emit(f"卸载模型失败: {error_msg}")
+                QMetaObject.invokeMethod(self, "unloadModelResult", Qt.ConnectionType.QueuedConnection,
+                                         Q_ARG(bool, False),
+                                         Q_ARG(str, f"卸载失败: {error_msg}"))
         except Exception as e:
-            self.statusUpdated.emit("错误: " + str(e))
+            error_msg = f"错误: {str(e)}"
+            self.statusUpdated.emit(error_msg)
+            QMetaObject.invokeMethod(self, "unloadModelResult", Qt.ConnectionType.QueuedConnection,
+                                     Q_ARG(bool, False),
+                                     Q_ARG(str, error_msg))
+    
+    @pyqtSlot(str)
+    def unloadModelWithForce(self, model_name):
+        """强制卸载运行中的模型"""
+        worker = APICallWorker(self._unload_model_with_force, model_name)
+        self.thread_pool.start(worker)
+    
+    def _unload_model_with_force(self, model_name):
+        """强制卸载运行中的模型"""
+        try:
+            self.statusUpdated.emit("强制卸载模型")
+            
+            # 直接使用 CLI 强制卸载
+            command = f"ollama rm --force {model_name}"
+            returncode, stdout, stderr = execute_command(command)
+            
+            if returncode == 0:
+                self.statusUpdated.emit("模型强制卸载成功")
+                self.getModels()
+                QMetaObject.invokeMethod(self, "unloadModelResult", Qt.ConnectionType.QueuedConnection,
+                                         Q_ARG(bool, True),
+                                         Q_ARG(str, "模型强制卸载成功"))
+            else:
+                error_msg = stderr.strip() if stderr else "强制卸载失败"
+                self.statusUpdated.emit(f"强制卸载模型失败: {error_msg}")
+                QMetaObject.invokeMethod(self, "unloadModelResult", Qt.ConnectionType.QueuedConnection,
+                                         Q_ARG(bool, False),
+                                         Q_ARG(str, f"强制卸载失败: {error_msg}"))
+        except Exception as e:
+            error_msg = f"错误: {str(e)}"
+            self.statusUpdated.emit(error_msg)
+            QMetaObject.invokeMethod(self, "unloadModelResult", Qt.ConnectionType.QueuedConnection,
+                                     Q_ARG(bool, False),
+                                     Q_ARG(str, error_msg))
+    
+    @pyqtSlot(str, result=bool)
+    def isModelLoaded(self, model_name):
+        """检查模型是否正在运行"""
+        try:
+            response = requests.get(f"{self.apiUrl}/ps", timeout=2)
+            if response.status_code == 200:
+                active_models = response.json().get("models", [])
+                for model in active_models:
+                    if model.get("name") == model_name:
+                        return True
+            return False
+        except:
+            return False
 
     @pyqtSlot(str, result=str)
     def translateDescription(self, description):

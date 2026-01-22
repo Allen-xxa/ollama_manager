@@ -22,3 +22,5 @@ temp/
 
 #编译脚本
 OllamaManager.spec
+
+doc/
