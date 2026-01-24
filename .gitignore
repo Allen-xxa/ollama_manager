@@ -23,4 +23,14 @@ temp/
 #编译脚本
 OllamaManager.spec
 
+#开发文档
 doc/
+
+#日志目录
+logs/
+
+#备份目录
+backup/
+
+
+NEW_TEST_PLAN.md

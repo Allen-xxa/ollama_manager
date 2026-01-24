@@ -120,7 +120,7 @@ Rectangle {
         
         // 下载任务状态更新信号
         function onDownloadTaskUpdated(task) {
-            console.log("Task updated:", task.modelName, "Status:", task.status)
+            // console.log("🔄 任务已更新:" + task.modelName + "状态:" + task.status)
             // 查找任务在列表中的位置
             var taskIndex = -1
             for (var i = 0; i < downloadTasks.length; i++) {
@@ -144,23 +144,19 @@ Rectangle {
                 
                 // 如果任务已完成或取消，从列表中移除
                 if (task.status === "completed" || task.status === "cancelled") {
-                    console.log("Removing task:", task.modelName, "Status:", task.status)
+                    // console.log("🗑️  移除任务:" + task.modelName + "状态:" + task.status)
                     newTasks.splice(taskIndex, 1)
                 }
             } else {
                 // 添加新任务（非已完成或取消状态）
                 if (task.status !== "completed" && task.status !== "cancelled") {
-                    console.log("Adding new task:", task.modelName, "Status:", task.status)
+                    // console.log("➕ 添加新任务:" + task.modelName + "状态:" + task.status)
                     newTasks = downloadTasks.slice()
                     newTasks.push(task)
                 } else {
                     newTasks = downloadTasks.slice()
                 }
             }
-            
-            console.log("New tasks length:", newTasks.length)
-            // 重新赋值整个数组，触发属性变化
-            downloadTasks = newTasks
         }
         
         // 下载进度更新信号

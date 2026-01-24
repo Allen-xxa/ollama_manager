@@ -27,7 +27,14 @@ Ollama Manager/
 │   ├── __init__.py          # 版本信息
 │   ├── main.py              # 应用入口
 │   ├── model_manager.py     # 模型管理核心逻辑
-│   └── dark_title_bar.py    # Windows 深色标题栏支持
+│   ├── dark_title_bar.py    # Windows 深色标题栏支持
+│   ├── logger.py            # 日志管理
+│   ├── downloader.py        # 模型下载器
+│   ├── update_manager.py    # 更新管理器
+│   ├── update_helper.py     # 更新辅助函数
+│   ├── updater.py           # 应用更新器
+│   ├── version_checker.py   # 版本检查器
+│   └── installer.py         # 安装器
 ├── ui/                       # 用户界面目录
 │   ├── main.qml             # 主界面
 │   ├── components/          # UI组件
@@ -44,20 +51,25 @@ Ollama Manager/
 │   │   ├── ServerManagerPage.qml    # 服务器管理
 │   │   ├── SettingsPage.qml         # 设置
 │   │   ├── AboutPage.qml            # 关于
-│   │   ├── AddAssistantPage.qml    # 添加助手（开发中）
-│   │   └── DefaultAssistantPage.qml # 默认助手（开发中）
+│   │   ├── AddAssistantPage.qml     # 添加助手（开发中）
+│   │   └── DefaultAssistantPage.qml  # 默认助手（开发中）
 │   ├── utils/               # 工具函数
 │   │   └── Utils.js
 │   └── assets/              # 资源文件
 │       ├── img/             # 图片
-│       └── fonts/          # 字体
+│       └── fonts/           # 字体
 ├── config/                   # 配置文件目录（运行时自动创建）
 │   ├── server.json          # 服务器配置
 │   ├── download_tasks.json  # 下载任务
-│   └── config.json          # 应用设置
-├── tests/                    # 测试目录（待实现）
-├── docs/                     # 文档目录（待实现）
-├── requirements.txt           # Python依赖
+│   ├── config.json          # 应用设置
+│   └── version.json.example # 版本配置示例
+├── logs/                     # 日志目录（运行时自动创建）
+├── temp/                     # 临时文件目录
+├── doc/                      # 文档目录
+├── plans/                    # 计划文档目录
+├── requirements.txt          # Python依赖
+├── build_simple.ps1          # 构建脚本
+├── debug.json                # 调试配置
 ├── ollama.png                # 应用图标
 └── README.md                 # 项目说明文档
 ```
@@ -71,6 +83,7 @@ Ollama Manager/
 - requests
 - beautifulsoup4
 - lxml
+- psutil
 
 ### 安装步骤
 
@@ -149,12 +162,20 @@ Ollama Manager/
 - **QML**: Qt 声明式语言，用于描述用户界面
 - **requests**: HTTP 请求库，用于与 Ollama API 通信
 - **beautifulsoup4**: HTML 解析库，用于爬取 Ollama 官方模型库
+- **psutil**: 系统资源监控库，用于获取磁盘、内存等使用情况
 
 ### 代码结构
 
 - **src/main.py**: 应用入口，初始化 QML 引擎和加载界面
 - **src/model_manager.py**: 核心业务逻辑，处理所有 API 调用和数据管理
 - **src/dark_title_bar.py**: Windows 平台深色标题栏支持
+- **src/logger.py**: 日志管理，记录应用运行日志
+- **src/downloader.py**: 模型下载器，处理模型下载任务
+- **src/update_manager.py**: 更新管理器，检查和安装应用更新
+- **src/update_helper.py**: 更新辅助函数，提供更新相关的工具方法
+- **src/updater.py**: 应用更新器，执行应用更新操作
+- **src/version_checker.py**: 版本检查器，检查应用是否有新版本
+- **src/installer.py**: 安装器，处理应用安装相关操作
 - **src/__init__.py**: 版本信息定义
 - **ui/**: QML 界面文件，使用 Qt Quick 构建 UI
 
@@ -185,6 +206,15 @@ Ollama Manager/
 欢迎提交 Issue 和 Pull Request！
 
 ## 更新日志
+
+### v1.2.0 (2026-01-24)
+- 新增应用更新机制，支持自动检查和安装更新
+- 增强模型卸载功能，提供更可靠的模型卸载方式
+- 优化项目结构，改进代码组织
+
+### v1.1.1 (2026-01-23)
+- 增强模型卸载功能
+- 修复一些小问题
 
 ### v1.1.0 (2026-01-21)
 - 新增模型所有版本查看功能

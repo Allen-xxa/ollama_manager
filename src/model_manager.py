@@ -104,7 +104,7 @@ class ModelManager(QObject):
                         # Save the configuration with the default server
                         self.save_config()
             except Exception as e:
-                print(f"Error loading config: {str(e)}")
+                print(f"❌ Error loading config: {str(e)}\n")
                 # 加载失败时使用默认配置
                 self._server_address = 'localhost'
                 self._server_port = '11434'
@@ -139,7 +139,7 @@ class ModelManager(QObject):
             with open(self.config_file, 'w', encoding='utf-8') as f:
                 json.dump(config, f, indent=2, ensure_ascii=False)
         except Exception as e:
-            print(f"Error saving config: {str(e)}")
+            print(f"❌ Error saving config: {str(e)}\n")
 
     def load_download_tasks(self):
         """从文件加载下载任务"""
@@ -152,9 +152,8 @@ class ModelManager(QObject):
                             task_data['status'] = 'paused'
                         self.download_tasks[task_name] = task_data
                     self.save_download_tasks()
-                    # 加载下载任务
             except Exception as e:
-                print(f"Error loading download tasks: {str(e)}")
+                print(f"❌ Error loading download tasks: {str(e)}\n")
 
     def save_download_tasks(self):
         """保存下载任务到文件"""
@@ -162,7 +161,7 @@ class ModelManager(QObject):
             with open(self.download_tasks_file, 'w', encoding='utf-8') as f:
                 json.dump(self.download_tasks, f, indent=2, ensure_ascii=False)
         except Exception as e:
-            print(f"Error saving download tasks: {str(e)}")
+            print(f"❌ Error saving download tasks: {str(e)}\n")
 
     def load_settings(self):
         """加载设置"""
@@ -171,7 +170,7 @@ class ModelManager(QObject):
                 with open(self.settings_file, 'r', encoding='utf-8') as f:
                     self._settings = json.load(f)
             except Exception as e:
-                print(f"Error loading settings: {str(e)}")
+                print(f"❌ Error loading settings: {str(e)}\n")
                 self._settings = {
                     "translation": {
                         "google_translation": True,
@@ -197,16 +196,15 @@ class ModelManager(QObject):
             with open(self.settings_file, 'w', encoding='utf-8') as f:
                 json.dump(self._settings, f, indent=2, ensure_ascii=False)
         except Exception as e:
-            print(f"Error saving settings: {str(e)}")
+            print(f"❌ Error saving settings: {str(e)}\n")
             # 尝试使用备份文件
             try:
                 backup_file = self.settings_file + ".backup"
                 if os.path.exists(backup_file):
                     with open(backup_file, 'r', encoding='utf-8') as f:
                         self._settings = json.load(f)
-                    # 从备份恢复设置
             except Exception as backup_error:
-                print(f"Error using backup file: {str(backup_error)}")
+                pass
 
     @pyqtProperty('QVariant', notify=settingsUpdated)
     def settings(self):
@@ -263,15 +261,36 @@ class ModelManager(QObject):
                     "ollama_prompt": "你是一个专业的翻译助手，请将以下内容翻译成中文，保持原文的意思和风格："
                 }
             
+            # 处理代理设置
+            if 'proxy' not in self._settings:
+                self._settings['proxy'] = {
+                    "type": "system",
+                    "address": ""
+                }
+            else:
+                # 验证代理设置的类型
+                proxy_type = self._settings['proxy'].get('type', 'system')
+                if proxy_type not in ['none', 'system', 'custom']:
+                    self._settings['proxy']['type'] = 'system'
+                
+                # 如果是自定义代理，且地址为空，使用默认值
+                if proxy_type == 'custom':
+                    if not self._settings['proxy'].get('address', ''):
+                        self._settings['proxy']['address'] = 'http://127.0.0.1:7890'
+            
+            # 移除根级别的 developer_mode，只保留 update.developer_mode
+            if 'developer_mode' in self._settings and 'update' in self._settings and 'developer_mode' in self._settings['update']:
+                del self._settings['developer_mode']
+            
             self.save_settings()
             self.settingsUpdated.emit()
         except Exception as e:
-            print(f"Error saving all settings: {str(e)}")
+            print(f"❌ Error saving all settings: {str(e)}\n")
             # 保持原有设置不变
             try:
                 self.load_settings()
             except Exception as load_error:
-                print(f"Error loading settings: {str(load_error)}")
+                pass
 
     @pyqtSlot(result='QVariantList')
     def loadDownloadTasksFromFile(self):
@@ -369,7 +388,6 @@ class ModelManager(QObject):
             is_connected = response.status_code == 200
             latency = (time.time() - start_time) * 1000  # 转换为毫秒
         except Exception as e:
-            print(f"Error testing server connection: {str(e)}")
             is_connected = False
             latency = 0
         
@@ -381,11 +399,20 @@ class ModelManager(QObject):
     @pyqtSlot(int, str, str, str)
     def updateServer(self, index, name, address, port):
         if 0 <= index < len(self._servers):
+            is_active_server = self._servers[index]['isActive']
+            
             self._servers[index]['name'] = name
             self._servers[index]['address'] = address
             self._servers[index]['port'] = port
+            
+            # 如果更新的是活跃服务器，同时更新当前服务器地址
+            if is_active_server:
+                self._server_address = address
+                self._server_port = port
+            
             # Force a new list reference to ensure QML detects the change
             self._servers = self._servers.copy()
+            
             self.save_config()
             self.serversUpdated.emit()
 
@@ -453,6 +480,7 @@ class ModelManager(QObject):
                 self.statusUpdated.emit("连接成功")
             else:
                 self.statusUpdated.emit("连接失败: " + str(response.status_code))
+                print(f"❌ 连接失败，状态码: {response.status_code}\n")
                 # 创建空模型列表以避免UI问题
                 QMetaObject.invokeMethod(self, "modelsUpdated", Qt.ConnectionType.QueuedConnection,
                                          Q_ARG(list, []))
@@ -486,7 +514,6 @@ class ModelManager(QObject):
                 QMetaObject.invokeMethod(self, "activeModelsDetailsUpdated", Qt.ConnectionType.QueuedConnection,
                                          Q_ARG(list, []))
         except Exception as e:
-            print(f"Error getting active models: {str(e)}")
             QMetaObject.invokeMethod(self, "activeModelsUpdated", Qt.ConnectionType.QueuedConnection,
                                      Q_ARG(int, 0))
             QMetaObject.invokeMethod(self, "activeModelsDetailsUpdated", Qt.ConnectionType.QueuedConnection,
@@ -520,7 +547,6 @@ class ModelManager(QObject):
                 QMetaObject.invokeMethod(self, "diskUsageUpdated", Qt.ConnectionType.QueuedConnection,
                                          Q_ARG(str, "0.0 GB"))
         except Exception as e:
-            print(f"Error getting disk usage: {str(e)}")
             QMetaObject.invokeMethod(self, "diskUsageUpdated", Qt.ConnectionType.QueuedConnection,
                                      Q_ARG(str, "0.0 GB"))
     
@@ -558,7 +584,6 @@ class ModelManager(QObject):
                 QMetaObject.invokeMethod(self, "vramUsageUpdated", Qt.ConnectionType.QueuedConnection,
                                          Q_ARG(str, "0 B"))
         except Exception as e:
-            print(f"Error getting VRAM usage: {str(e)}")
             QMetaObject.invokeMethod(self, "vramUsageUpdated", Qt.ConnectionType.QueuedConnection,
                                      Q_ARG(str, "0 B"))
 
@@ -634,8 +659,6 @@ class ModelManager(QObject):
                 self.statusUpdated.emit("任务已经是暂停状态")
             else:
                 self.statusUpdated.emit("未找到下载任务")
-        else:
-            self.statusUpdated.emit("未找到下载任务")
 
     @pyqtSlot(str)
     def resumeDownload(self, model_name):
@@ -665,8 +688,6 @@ class ModelManager(QObject):
     def cancelDownload(self, model_name):
         """取消下载任务"""
         if model_name in self.download_tasks:
-            self.statusUpdated.emit("正在删除任务")
-            
             # 设置取消事件（如果存在）
             if model_name in self.download_cancel_events:
                 self.download_cancel_events[model_name].set()
@@ -706,29 +727,35 @@ class ModelManager(QObject):
                     if model.get("name") == model_name:
                         return model.get("digest", "")
         except Exception as e:
-            print(f"Error getting model digest: {str(e)}")
+            print(f"Error getting model digest: {str(e)}\n")
         return ""
 
     def _pull_model(self, model_name):
         import time
         import re
+        # print(f"🔍 正在请求: {self.apiUrl}/pull")
         try:
             is_resume = self.download_tasks[model_name].get('canResume', False)
             if is_resume:
                 self.statusUpdated.emit("断点续传")
+                # print("⏸️  断点续传")
             else:
                 self.statusUpdated.emit("检查模型更新")
+                # print("🔍 检查模型更新")
             
             # 检查任务是否已被暂停
             if model_name in self.download_tasks and self.download_tasks[model_name]['status'] == 'paused':
                 self.statusUpdated.emit("任务已被暂停")
+                # print("⏸️  任务已被暂停")
                 return
             
             current_digest = self._get_current_model_digest(model_name)
             if current_digest:
                 self.statusUpdated.emit("当前模型哈希: " + current_digest[:16] + "...")
+                # print(f"🔐 当前模型哈希: {current_digest[:16]}...")
             
             self.statusUpdated.emit("拉取模型")
+            # print("📥 拉取模型")
             
             # 确保任务状态为 downloading
             if model_name in self.download_tasks:
@@ -933,6 +960,7 @@ class ModelManager(QObject):
                                              Q_ARG('QVariant', self.download_tasks[model_name]))
                     
                     self.statusUpdated.emit("模型更新成功")
+                    print(f"✅ 模型更新成功: {model_name}\n")
                     self.getModels()
                     
                     if model_name in self.download_tasks:
@@ -942,6 +970,7 @@ class ModelManager(QObject):
                         del self.download_cancel_events[model_name]
             else:
                 self.statusUpdated.emit("拉取失败")
+                print(f"❌ 拉取失败: {model_name}\n")
                 if model_name in self.download_tasks:
                     self.download_tasks[model_name]['status'] = 'failed'
                     self.download_tasks[model_name]['canResume'] = True
@@ -952,6 +981,7 @@ class ModelManager(QObject):
                     del self.download_cancel_events[model_name]
         except requests.exceptions.Timeout:
             self.statusUpdated.emit("拉取模型超时，请检查网络连接")
+            print(f"❌ 拉取模型超时: {model_name}\n")
             if model_name in self.download_tasks:
                 self.download_tasks[model_name]['status'] = 'failed'
                 self.download_tasks[model_name]['canResume'] = True
@@ -963,6 +993,7 @@ class ModelManager(QObject):
         except Exception as e:
             try:
                 self.statusUpdated.emit(f"错误: {str(e)}")
+                print(f"❌ 错误: {str(e)}\n")
                 if model_name in self.download_tasks:
                     self.download_tasks[model_name]['status'] = 'failed'
                     self.download_tasks[model_name]['canResume'] = True
@@ -975,6 +1006,7 @@ class ModelManager(QObject):
                 if "wrapped C/C++ object of type ModelManager has been deleted" in str(re):
                     return
                 raise
+        print("-" * 50 + "\n")
     
     def _format_time(self, seconds):
         """格式化时间为可读格式"""
@@ -1142,7 +1174,6 @@ class ModelManager(QObject):
             # 检查缓存
             cache_key = description.strip()
             if cache_key in self.translation_cache:
-                # print(f"Using cached translation for: {cache_key[:50]}...")
                 return self.translation_cache[cache_key]
             
             # 获取翻译设置
@@ -1185,31 +1216,24 @@ class ModelManager(QObject):
                                     if clean_translated and clean_translated != description:
                                         # 存储到缓存
                                         self.translation_cache[cache_key] = clean_translated
-                                        # print(f"Cached translation for: {cache_key[:50]}...")
                                         return clean_translated
                             
                             # 重试逻辑
                             retry_count += 1
                             if retry_count < max_retries:
-                                # print(f"Ollama translation attempt {retry_count} failed, retrying...")
                                 import time
                                 time.sleep(1)  # 短暂延迟后重试
                                 
-                        except requests.exceptions.Timeout as timeout_error:
-                            # print(f"Ollama translation timeout error (attempt {retry_count + 1}): {str(timeout_error)}")
+                        except requests.exceptions.Timeout:
                             retry_count += 1
                             if retry_count < max_retries:
-                                # print(f"Retrying translation (attempt {retry_count + 1})...")
                                 import time
                                 time.sleep(1)
-                        except requests.exceptions.ConnectionError as conn_error:
-                            # print(f"Ollama translation connection error: {str(conn_error)}")
+                        except requests.exceptions.ConnectionError:
                             break  # 连接错误不再重试
-                        except Exception as ollama_error:
-                            # print(f"Ollama translation error (attempt {retry_count + 1}): {str(ollama_error)}")
+                        except Exception:
                             retry_count += 1
                             if retry_count < max_retries:
-                                # print(f"Retrying translation (attempt {retry_count + 1})...")
                                 import time
                                 time.sleep(1)
             
@@ -1231,14 +1255,10 @@ class ModelManager(QObject):
                         # 存储到缓存
                         if translated and translated != description:
                             self.translation_cache[cache_key] = translated
-                            # print(f"Cached translation for: {cache_key[:50]}...")
                         return translated
-                except Exception as google_error:
-                    # print(f"Google translation error: {str(google_error)}")
+                except Exception:
                     pass
         except Exception as e:
-            # print(f"Translation error: {str(e)}")
-            # 如果翻译失败，返回原文
             pass
         return description
 
@@ -1247,7 +1267,6 @@ class ModelManager(QObject):
         """清除翻译缓存"""
         cache_size = len(self.translation_cache)
         self.translation_cache.clear()
-        # print(f"Translation cache cleared. Removed {cache_size} entries.")
 
     @pyqtSlot(result=int)
     def getTranslationCacheSize(self):
@@ -1743,7 +1762,6 @@ class ModelManager(QObject):
         except Exception as e:
             error_msg = f"获取模型详情失败: {str(e)}"
             self.modelDetailsStatusUpdated.emit(error_msg)
-            # print(f"Error in _get_model_details: {str(e)}")
             # 发送空数据
             QMetaObject.invokeMethod(self, "modelDetailsUpdated", Qt.ConnectionType.QueuedConnection,
                                      Q_ARG(list, []),
