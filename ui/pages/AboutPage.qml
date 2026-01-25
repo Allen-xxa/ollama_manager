@@ -607,7 +607,7 @@ Rectangle {
                 height: 100
                 
                 Image {
-                    source: "../assets/img/white.svg"
+                    source: "../../icon.png"
                     sourceSize: Qt.size(100, 100)
                 }
                 

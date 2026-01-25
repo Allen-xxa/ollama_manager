@@ -112,7 +112,7 @@ if __name__ == "__main__":
     app = QGuiApplication(sys.argv)
     
     # 设置应用程序图标
-    icon_path = os.path.join(app_dir, "ollama.png")
+    icon_path = os.path.join(app_dir, "icon.png")
     if os.path.exists(icon_path):
         app.setWindowIcon(QIcon(icon_path))
     
